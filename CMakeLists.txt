@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(zaf)
+project(zaf VERSION 0.1.0 DESCRIPTION "ZMQ-based Actor Framework")
 
 set(ENABLE_TEST true)
 set(ENABLE_PHMAP true)
@@ -22,6 +22,8 @@ endif ()
 find_package(GLOG REQUIRED)
 include_directories(${GLOG_INCLUDE_DIR})
 set(BasicLibs ${BasicLibs} ${GLOG_LIBRARY})
+
+#set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fno-omit-frame-pointer")
 
 if (${ENABLE_PHMAP})
   add_definitions(-DENABLE_PHMAP=1)
@@ -48,3 +50,20 @@ if (${ENABLE_TEST})
 endif ()
 
 add_subdirectory(examples)
+
+# make install
+include_directories(core)
+set(ZAFSources ${CoreSources})
+set(ZAFHeaders ${CoreHeaders})
+add_library(zaf STATIC ${ZAFSources})
+set_target_properties(zaf PROPERTIES
+  VERSION ${PROJECT_VERSION})
+include(GNUInstallDirs)
+install(TARGETS zaf
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(DIRECTORY core/zaf/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/zaf
+  FILES_MATCHING
+  PATTERN "*.hpp"
+  PATTERN "*.tpp")
