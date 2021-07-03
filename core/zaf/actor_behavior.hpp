@@ -41,6 +41,8 @@ public:
   }
 
   // to process one incoming message with message handlers
+  void receive_once(MessageHandlers&& handlers);
+  void receive_once(MessageHandlers& handlers);
   void receive(MessageHandlers&& handlers);
   void receive(MessageHandlers& handlers);
 

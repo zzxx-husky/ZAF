@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
       zaf::Code{0} - [&](const std::string& world) {
         LOG(INFO) << "Expected world, received " << world;
         self.send(self.get_current_sender_actor(), 2, std::string("hello world"));
+        self.deactivate();
       }
     });
   });

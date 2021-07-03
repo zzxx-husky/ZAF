@@ -35,11 +35,11 @@ void ActorBehavior::deactivate() {
   this->activated = false;
 }
 
-void ActorBehavior::receive(MessageHandlers&& handlers) {
-  this->receive(handlers);
+void ActorBehavior::receive_once(MessageHandlers&& handlers) {
+  this->receive_once(handlers);
 }
 
-void ActorBehavior::receive(MessageHandlers& handlers) {
+void ActorBehavior::receive_once(MessageHandlers& handlers) {
   if (!recv_socket.recv(current_sender_routing_id)) {
     LOG(WARNING) << "Error when receiving a routing id.";
     return;
@@ -52,6 +52,17 @@ void ActorBehavior::receive(MessageHandlers& handlers) {
   Message* message = *reinterpret_cast<Message**>(message_ptr.data());
   handlers.process(*message);
   delete message;
+}
+
+void ActorBehavior::receive(MessageHandlers&& handlers) {
+  this->receive(handlers);
+}
+
+void ActorBehavior::receive(MessageHandlers& handlers) {
+  this->activated = true;
+  while (this->activated) {
+    this->receive_once(handlers);
+  }
 }
 
 void ActorBehavior::initialize_actor(ActorSystem& sys) {
@@ -69,17 +80,14 @@ void ActorBehavior::initialize_actor(ActorSystem& sys) {
   recv_socket.bind("inproc://" + recv_routing_id);
   auto send_routing_id = get_routing_id(actor_id, false);
   send_socket.set(zmq::sockopt::routing_id, zmq::buffer(send_routing_id));
+  send_socket.set(zmq::sockopt::sndhwm, 0);
   send_socket.connect("inproc://" + recv_routing_id);
   connected_receivers.insert(get_self_actor());
 }
 
 void ActorBehavior::launch() {
   start();
-  auto handlers = behavior();
-  this->activated = true;
-  while (this->activated) {
-    this->receive(handlers);
-  }
+  this->receive(behavior());
   stop();
 }
 

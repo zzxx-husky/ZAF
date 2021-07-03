@@ -7,6 +7,7 @@
 
 #include "actor.hpp"
 #include "actor_behavior.hpp"
+#include "scoped_actor.hpp"
 
 #include "zmq.hpp"
 
@@ -30,6 +31,8 @@ public:
     new_actor_thread.detach();
     return {new_actor->get_actor_id()};
   }
+
+  ScopedActor create_scoped_actor();
 
   template<typename Behavior, typename ... ArgT,
     std::enable_if_t<std::is_invocable_v<Behavior, ActorBehavior&, ArgT...>>* = nullptr>

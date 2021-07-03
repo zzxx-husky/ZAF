@@ -1,4 +1,6 @@
+#include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
+#include "zaf/scoped_actor.hpp"
 
 namespace zaf {
 ActorSystem::ActorSystem(ActorSystem&& other) {
@@ -8,6 +10,12 @@ ActorSystem::ActorSystem(ActorSystem&& other) {
   other.num_alive_actors = 0;
   this->next_available_actor_id = other.next_available_actor_id.load();
   other.next_available_actor_id = 0;
+}
+
+ScopedActor ActorSystem::create_scoped_actor() {
+  auto new_actor = new ActorBehavior();
+  new_actor->initialize_actor(*this);
+  return {new_actor};
 }
 
 zmq::context_t& ActorSystem::get_zmq_context() {
