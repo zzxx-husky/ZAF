@@ -2,10 +2,9 @@
 
 #ifndef ZAF_ACTOR_ID_TYPE
 #define ZAF_ACTOR_ID_TYPE uint32_t
+#endif
 
 using ActorIdType = ZAF_ACTOR_ID_TYPE;
-
-#endif
 
 #ifndef ENABLE_PHMAP
 #define ENABLE_PHMAP 0
