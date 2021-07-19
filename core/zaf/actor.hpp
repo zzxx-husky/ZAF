@@ -21,6 +21,8 @@ public:
 
   ActorIdType get_actor_id() const;
 
+  operator bool() const;
+
   friend bool operator==(const Actor&, const Actor&);
 
 private:

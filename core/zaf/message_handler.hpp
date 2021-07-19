@@ -43,11 +43,18 @@ public:
   template<size_t ... I>
   inline void invoke(Message& m, std::index_sequence<I ...>) {
     m.fill_with_element_addrs(message_element_addrs);
-    handler(
-      *reinterpret_cast<typename ArgTypes::template decay_arg_t<I>*>(
-        message_element_addrs.operator[](I)
-      ) ...
-    );
+    try {
+      handler(
+        static_cast<typename ArgTypes::template arg_t<I>>(
+          *reinterpret_cast<typename ArgTypes::template decay_arg_t<I>*>(
+            message_element_addrs.operator[](I)
+          )
+        )...
+      );
+    } catch (...) {
+      LOG(ERROR) << "Exception caught in " << __PRETTY_FUNCTION__ << " when handling message with code " << m.get_code();
+      throw;
+    }
   }
 };
 
@@ -65,6 +72,10 @@ struct Code {
     MessageHandler* handler = new TypedMessageHandler<HandlerX>(std::forward<Handler>(user_handler));
     return std::make_pair(code.value, std::unique_ptr<MessageHandler>(handler));
   }
+
+  inline operator size_t() const {
+    return value;
+  }
 };
 
 class MessageHandlers {
@@ -73,6 +84,10 @@ public:
   MessageHandlers(ArgT&& ... args) {
     add_handlers(std::forward<ArgT>(args) ...);
   }
+
+  MessageHandlers(MessageHandlers&& other);
+
+  MessageHandlers& operator=(MessageHandlers&& other);
 
   inline void process(Message& m) {
     try {

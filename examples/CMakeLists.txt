@@ -10,4 +10,5 @@ macro(add symbol file)
 endmacro()
 
 add(HelloWorld hello_world.cpp)
+add(HelloWorldByActorEngine hello_world_by_actor_engine.cpp)
 add(Shuffle shuffle.cpp)

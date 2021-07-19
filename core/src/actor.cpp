@@ -22,4 +22,8 @@ ActorIdType Actor::get_actor_id() const {
 bool operator==(const Actor& a, const Actor& b) {
   return a.actor_id == b.actor_id;
 }
+
+Actor::operator bool() const {
+  return actor_id != 0;
+}
 } // namespace zaf

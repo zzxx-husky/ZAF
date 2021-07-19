@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
     receivers.emplace_back(system.spawn([=](auto& self) {
       int num_termination = 0;
       int num_msg_recv = 0;
+      self.activate();
       self.receive({
         zaf::Code{0} - [&num_msg_recv](int) {
           ++num_msg_recv;
