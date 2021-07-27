@@ -9,9 +9,7 @@
 
 namespace zaf {
 class ActorSystem;
-/**
- * 1. We use [actor id][zaf][s/r] as the routing id of the zmq socket.
- **/
+
 class ActorBehavior {
 public:
   ActorBehavior();
@@ -103,11 +101,7 @@ public:
 private:
   void connect_to(ActorIdType peer);
 
-  const std::string& get_routing_id(ActorIdType id, bool send_or_recv) {
-    *reinterpret_cast<ActorIdType*>(&routing_id_buffer.front()) = id;
-    routing_id_buffer.back() = send_or_recv ? 's' : 'r';
-    return routing_id_buffer;
-  }
+  const std::string& get_routing_id(ActorIdType id, bool send_or_recv);
 
   ActorIdType actor_id;
 

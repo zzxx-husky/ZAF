@@ -6,6 +6,19 @@
 
 using ActorIdType = ZAF_ACTOR_ID_TYPE;
 
+#ifndef ZAF_ACTOR_ID_MAX_LEN
+#define ZAF_ACTOR_ID_MAX_LEN 5
+#endif
+
+inline constexpr size_t ActorIdMaxLen = ZAF_ACTOR_ID_MAX_LEN;
+inline constexpr size_t MaxActorId = []() {
+  size_t max_id = 1;
+  for (int i = 0; i < ActorIdMaxLen; i++) {
+    max_id *= 10;
+  }
+  return max_id;
+}();
+
 #ifndef ENABLE_PHMAP
 #define ENABLE_PHMAP 0
 #elif ENABLE_PHMAP

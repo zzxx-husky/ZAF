@@ -23,20 +23,10 @@ public:
   // ActorSystem(ActorSystem&&);
   // ActorSystem& operator=(ActorSystem&&);
 
-  template<typename ActorClass, typename ... ArgT>
-  Actor spawn(ArgT&& ... args) {
-    auto new_actor = new ActorClass(std::forward<ArgT>(args) ...);
-    new_actor->initialize_actor(*this);
-    // only after initialize_actor we get the actor id.
-    auto new_actor_id = new_actor->get_actor_id();
-    std::thread([new_actor]() mutable {
-      new_actor->launch();
-      delete new_actor;
-    }).detach();
-    return {new_actor_id};
-  }
-
   ScopedActor create_scoped_actor();
+
+  using ActorGroup::spawn;
+  Actor spawn(ActorBehavior* new_actor) override;
 
   template<typename Runnable,
     std::enable_if_t<std::is_invocable_v<Runnable, ActorBehavior&>>* = nullptr>

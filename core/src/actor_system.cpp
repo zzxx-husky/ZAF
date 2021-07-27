@@ -3,23 +3,16 @@
 #include "zaf/scoped_actor.hpp"
 
 namespace zaf {
-// ActorSystem::ActorSystem(ActorSystem&& other) {
-//   this->zmq_context.close();
-//   this->zmq_context = std::move(other.zmq_context);
-//   this->num_alive_actors = other.num_alive_actors.load();
-//   other.num_alive_actors = 0;
-//   this->next_available_actor_id = other.next_available_actor_id.load();
-//   other.next_available_actor_id = 0;
-// }
-
-// ActorSystem& ActorSystem::operator=(ActorSystem&& other) {
-//   this->zmq_context.close();
-//   this->zmq_context = std::move(other.zmq_context);
-//   this->num_alive_actors = other.num_alive_actors.load();
-//   other.num_alive_actors = 0;
-//   this->next_available_actor_id = other.next_available_actor_id.load();
-//   other.next_available_actor_id = 0;
-// }
+Actor ActorSystem::spawn(ActorBehavior* new_actor) {
+  new_actor->initialize_actor(*this);
+  // only after initialize_actor we get the actor id.
+  auto new_actor_id = new_actor->get_actor_id();
+  std::thread([new_actor]() mutable {
+    new_actor->launch();
+    delete new_actor;
+  }).detach();
+  return {new_actor_id};
+}
 
 ScopedActor ActorSystem::create_scoped_actor() {
   auto new_actor = new ActorBehavior();
@@ -32,7 +25,7 @@ zmq::context_t& ActorSystem::get_zmq_context() {
 }
 
 ActorIdType ActorSystem::get_next_available_actor_id() {
-  return next_available_actor_id.fetch_add(1, std::memory_order::memory_order_relaxed);
+  return next_available_actor_id.fetch_add(1, std::memory_order::memory_order_relaxed) % MaxActorId;
 }
 
 ActorSystem::~ActorSystem() {

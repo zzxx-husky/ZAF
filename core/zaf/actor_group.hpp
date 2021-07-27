@@ -4,6 +4,9 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "actor.hpp"
+#include "actor_behavior.hpp"
+
 namespace zaf {
 class ActorGroup {
 public:
@@ -12,6 +15,13 @@ public:
   void inc_num_alive_actors();
 
   void dec_num_alive_actors();
+
+  template<typename ActorClass, typename ... ArgT>
+  Actor spawn(ArgT&& ... args) {
+    return spawn(new ActorClass(std::forward<ArgT>(args)...));
+  }
+
+  virtual Actor spawn(ActorBehavior* new_actor) = 0;
 
 private:
   std::atomic<size_t> num_alive_actors{0};

@@ -10,7 +10,7 @@ A ZMQ-based C++ actor framework.
 
 1. Current implementation is limited to communication among local threads. Add I/O actors to support communication across machines.
 2. Runtime type check on the message elements and the message handler arguments.
-3. Enable task stealing in ActorEngine.
+3. Add necessary info (in this README or in wiki) to introduce how to use this framework.
 
 ## Notes
 

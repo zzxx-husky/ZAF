@@ -4,8 +4,8 @@
 namespace zaf {
 
 ActorBehavior::ActorBehavior() {
-  routing_id_buffer.reserve(sizeof(ActorIdType) + 4);
-  routing_id_buffer.append(sizeof(ActorIdType), ' ');
+  routing_id_buffer.reserve(ActorIdMaxLen + 4);
+  routing_id_buffer.append(ActorIdMaxLen, '0');
   routing_id_buffer.append("zaf ");
 }
 
@@ -26,9 +26,12 @@ ActorIdType ActorBehavior::get_current_sender_actor_id() const {
   // current_sender_routing_id.data() has more content than an actor id,
   // but actor id is at the head of current_sender_routing_id.data()
   // so we directly cast it to an actor id.
-  auto sender_actor_id = *reinterpret_cast<ActorIdType*>(
-    const_cast<void*>(current_sender_routing_id.data())
-  );
+  ActorIdType sender_actor_id{0};
+  auto id = reinterpret_cast<const char*>(current_sender_routing_id.data());
+  for (int i = ActorIdMaxLen - 1; i >= 0; i--) {
+    sender_actor_id *= 10;
+    sender_actor_id += id[i] - '0';
+  }
   return sender_actor_id;
 }
 
@@ -145,5 +148,18 @@ void ActorBehavior::connect_to(ActorIdType peer_id) {
     LOG(ERROR) << this->get_actor_id() << " failed to connect to receiver " << peer_id << " via " << routing_id;
     throw;
   }
+}
+
+// [actor id][zaf][s/r] as the routing id of the zmq socket.
+// Note: originally we used the exact bytes of the actor id in the routing_id, however,
+// zmq_connect requires a `const char*` instead of `std::string`, in case the routing id
+// contains '\0', zmq ignores the part after the first '\0'. Sad.
+const std::string& ActorBehavior::get_routing_id(ActorIdType id, bool send_or_recv) {
+  for (int i = 0; i < ActorIdMaxLen; i++) {
+    routing_id_buffer[i] = id % 10 + '0';
+    id /= 10;
+  }
+  routing_id_buffer.back() = send_or_recv ? 's' : 'r';
+  return routing_id_buffer;
 }
 } // namespace zaf
