@@ -4,7 +4,7 @@
 
 namespace zaf {
 Actor ActorSystem::spawn(ActorBehavior* new_actor) {
-  new_actor->initialize_actor(*this);
+  new_actor->initialize_actor(*this, *this);
   // only after initialize_actor we get the actor id.
   auto new_actor_id = new_actor->get_actor_id();
   std::thread([new_actor]() mutable {
@@ -16,7 +16,7 @@ Actor ActorSystem::spawn(ActorBehavior* new_actor) {
 
 ScopedActor ActorSystem::create_scoped_actor() {
   auto new_actor = new ActorBehavior();
-  new_actor->initialize_actor(*this);
+  new_actor->initialize_actor(*this, *this);
   return {new_actor};
 }
 

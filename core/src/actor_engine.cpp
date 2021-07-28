@@ -4,7 +4,7 @@
 
 namespace zaf {
 Actor ActorEngine::spawn(ActorBehavior* new_actor) {
-  new_actor->initialize_actor(forwarder->get_actor_system());
+  new_actor->initialize_actor(forwarder->get_actor_system(), *this);
   auto new_actor_id = new_actor->get_actor_id();
   this->inc_num_alive_actors();
   forwarder->send(executors[next_executor++ % num_executors], Executor::NewActor, new_actor);

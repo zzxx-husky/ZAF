@@ -19,6 +19,10 @@ ActorSystem& ActorBehavior::get_actor_system() {
   return *actor_system_ptr;
 }
 
+ActorGroup& ActorBehavior::get_actor_group() {
+  return *actor_group_ptr;
+}
+
 ActorIdType ActorBehavior::get_current_sender_actor_id() const {
   if (current_sender_routing_id.empty()) {
     return 0;
@@ -90,9 +94,10 @@ void ActorBehavior::receive(MessageHandlers& handlers, bool non_blocking) {
   }
 }
 
-void ActorBehavior::initialize_actor(ActorSystem& sys) {
+void ActorBehavior::initialize_actor(ActorSystem& sys, ActorGroup& group) {
   try {
     actor_system_ptr = &sys;
+    actor_group_ptr = &group;
     sys.inc_num_alive_actors();
 
     auto& ctx = sys.get_zmq_context();

@@ -32,7 +32,7 @@ public:
     std::enable_if_t<std::is_invocable_v<Runnable, ActorBehavior&>>* = nullptr>
   Actor spawn(Runnable&& runnable) {
     auto new_actor = new ActorBehavior();
-    new_actor->initialize_actor(*this);
+    new_actor->initialize_actor(*this, *this);
     // only after initialize_actor we get the actor id.
     auto new_actor_id = new_actor->get_actor_id();
     std::thread([run = std::forward<Runnable>(runnable), new_actor]() mutable {

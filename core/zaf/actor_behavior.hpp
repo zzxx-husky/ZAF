@@ -9,6 +9,7 @@
 
 namespace zaf {
 class ActorSystem;
+class ActorGroup;
 
 class ActorBehavior {
 public:
@@ -75,6 +76,8 @@ public:
 
   ActorSystem& get_actor_system();
 
+  ActorGroup& get_actor_group();
+
   ActorIdType get_current_sender_actor_id() const;
 
   Actor get_current_sender_actor() const;
@@ -88,7 +91,7 @@ public:
   /**
    * To be used by ZAF
    **/
-  void initialize_actor(ActorSystem& sys);
+  void initialize_actor(ActorSystem& sys, ActorGroup& group);
 
   zmq::socket_t& get_recv_socket();
 
@@ -108,6 +111,7 @@ private:
   std::string routing_id_buffer;
 
   ActorSystem* actor_system_ptr = nullptr;
+  ActorGroup* actor_group_ptr = nullptr;
   zmq::socket_t send_socket, recv_socket;
   zmq::message_t current_sender_routing_id;
   bool activated = false;
