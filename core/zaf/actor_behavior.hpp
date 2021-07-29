@@ -42,6 +42,9 @@ public:
 
   template<typename ... ArgT>
   void send(ActorIdType receiver_id, size_t code, ArgT&& ... args) {
+    if (!receiver_id) {
+      return; // ignore message sent to null actor
+    }
     if (connected_receivers.insert(receiver_id).second) {
       // newly inserted
       connect_to(receiver_id);

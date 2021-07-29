@@ -23,7 +23,7 @@ public:
   // ActorSystem(ActorSystem&&);
   // ActorSystem& operator=(ActorSystem&&);
 
-  ScopedActor create_scoped_actor();
+  ScopedActor create_scoped_actor() override;
 
   using ActorGroup::spawn;
   Actor spawn(ActorBehavior* new_actor) override;

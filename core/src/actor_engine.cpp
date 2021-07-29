@@ -11,6 +11,10 @@ Actor ActorEngine::spawn(ActorBehavior* new_actor) {
   return {new_actor_id};
 }
 
+ScopedActor ActorEngine::create_scoped_actor() {
+  return forwarder->get_actor_system().create_scoped_actor();
+}
+
 void ActorEngine::set_load_diff_ratio(double ratio) {
   this->load_diff_ratio = ratio;
 }

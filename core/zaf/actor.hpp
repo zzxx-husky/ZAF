@@ -35,7 +35,7 @@ namespace std {
 template<>
 struct hash<zaf::Actor> {
   inline size_t operator()(const zaf::Actor& actor) const {
-    return {actor.get_actor_id()};
+    return actor.get_actor_id();
   }
 };
 } // namespace std

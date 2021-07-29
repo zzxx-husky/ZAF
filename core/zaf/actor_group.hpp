@@ -6,6 +6,7 @@
 
 #include "actor.hpp"
 #include "actor_behavior.hpp"
+#include "scoped_actor.hpp"
 
 namespace zaf {
 class ActorGroup {
@@ -22,6 +23,7 @@ public:
   }
 
   virtual Actor spawn(ActorBehavior* new_actor) = 0;
+  virtual ScopedActor create_scoped_actor() = 0;
 
 private:
   std::atomic<size_t> num_alive_actors{0};

@@ -89,7 +89,8 @@ void ActorBehavior::receive(MessageHandlers&& handlers, bool non_blocking) {
 }
 
 void ActorBehavior::receive(MessageHandlers& handlers, bool non_blocking) {
-  while (this->activated) {
+  this->activate();
+  while (this->is_activated()) {
     this->receive_once(handlers, non_blocking);
   }
 }
@@ -125,10 +126,12 @@ zmq::socket_t& ActorBehavior::get_recv_socket() {
 }
 
 void ActorBehavior::launch() {
-  start();
-  activate();
-  this->receive(behavior());
-  stop();
+  this->activate();
+  this->start();
+  if (this->is_activated()) {
+    this->receive(this->behavior(), false);
+  }
+  this->stop();
 }
 
 ActorBehavior::~ActorBehavior() {

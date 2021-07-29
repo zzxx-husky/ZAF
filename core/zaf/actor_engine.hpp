@@ -7,6 +7,7 @@
 #include "actor_behavior.hpp"
 #include "actor_group.hpp"
 #include "actor_system.hpp"
+#include "scoped_actor.hpp"
 
 namespace zaf {
 class ActorEngine : public ActorGroup {
@@ -19,6 +20,7 @@ public:
 
   using ActorGroup::spawn;
   Actor spawn(ActorBehavior* new_actor) override;
+  ScopedActor create_scoped_actor() override;
 
   void set_load_diff_ratio(double ratio);
   void set_load_rebalance_period(size_t period);
