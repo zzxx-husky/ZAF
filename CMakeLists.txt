@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(zaf VERSION 0.1.0 DESCRIPTION "ZMQ-based Actor Framework")
 
+if (POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif ()
+
 set(ENABLE_TEST true)
 set(ENABLE_PHMAP true)
 set(BasicLibs pthread rt)
@@ -55,11 +59,19 @@ add_subdirectory(examples)
 include_directories(core)
 set(ZAFSources ${CoreSources})
 set(ZAFHeaders ${CoreHeaders})
-add_library(zaf STATIC ${ZAFSources})
-set_target_properties(zaf PROPERTIES
+add_library(zaf_static STATIC ${ZAFSources})
+add_library(zaf_shared SHARED ${ZAFSources})
+set_target_properties(zaf_static PROPERTIES
+  OUTPUT_NAME zaf
+  VERSION ${PROJECT_VERSION})
+set_target_properties(zaf_shared PROPERTIES
+  OUTPUT_NAME zaf
   VERSION ${PROJECT_VERSION})
 include(GNUInstallDirs)
-install(TARGETS zaf
+install(TARGETS zaf_static
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS zaf_shared
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY core/zaf/
