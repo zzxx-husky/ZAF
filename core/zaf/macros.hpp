@@ -23,6 +23,7 @@ inline constexpr size_t MaxActorId = []() {
 #define ENABLE_PHMAP 0
 #elif ENABLE_PHMAP
 #include "parallel_hashmap/phmap.h"
+#include "parallel_hashmap/btree.h"
 #pragma message("Use phmap hash map and hash set")
 #endif
 
@@ -42,4 +43,32 @@ using DefaultHashSet = phmap::flat_hash_set<ArgT ...>;
 #include <unordered_set>
 template<typename ... ArgT>
 using DefaultHashSet = std::unordered_set<ArgT ...>;
+#endif
+
+#if ENABLE_PHMAP
+template<typename ... ArgT>
+using DefaultSortedMap = phmap::btree_map<ArgT ...>;
+#else
+#include <map>
+template<typename ... ArgT>
+using DefaultSortedMap = std::map<ArgT ...>;
+#endif
+
+#if ENABLE_PHMAP
+template<typename ... ArgT>
+using DefaultSortedMultiMap = phmap::btree_multimap<ArgT ...>;
+#else
+#include <multimap>
+template<typename ... ArgT>
+using DefaultSortedMultiMap = std::multimap<ArgT ...>;
+#endif
+
+
+#if ENABLE_PHMAP
+template<typename ... ArgT>
+using DefaultSortedSet = phmap::btree_set<ArgT ...>;
+#else
+#include <set>
+template<typename ... ArgT>
+using DefaultSortedSet = std::set<ArgT ...>;
 #endif

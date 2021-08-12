@@ -8,16 +8,21 @@ Actor ActorSystem::spawn(ActorBehavior* new_actor) {
   // only after initialize_actor we get the actor id.
   auto new_actor_id = new_actor->get_actor_id();
   std::thread([new_actor]() mutable {
-    new_actor->launch();
+    try {
+      new_actor->launch();
+    } catch (const std::exception& e) {
+      std::cerr << "Exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+      print_exception(e);
+    } catch (...) {
+      std::cerr << "Unknown exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+    }
     delete new_actor;
   }).detach();
   return {new_actor_id};
 }
 
-ScopedActor ActorSystem::create_scoped_actor() {
-  auto new_actor = new ActorBehavior();
-  new_actor->initialize_actor(*this, *this);
-  return {new_actor};
+void ActorSystem::init_scoped_actor(ActorBehavior& new_actor) {
+  new_actor.initialize_actor(*this, *this);
 }
 
 zmq::context_t& ActorSystem::get_zmq_context() {
@@ -31,5 +36,16 @@ ActorIdType ActorSystem::get_next_available_actor_id() {
 ActorSystem::~ActorSystem() {
   this->await_all_actors_done();
   zmq_context.close();
+}
+
+void ActorSystem::set_identifier(const std::string& identifier) {
+  if (num_alive_actors.load(std::memory_order::memory_order_relaxed) == 0) {
+    throw ZAFException("ActorSystem's identifier cannot be updated if there is any alive actor.");
+  }
+  this->identifier = identifier;
+}
+
+const std::string& ActorSystem::get_identifier() const {
+  return this->identifier;
 }
 } // namespace zaf

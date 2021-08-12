@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "hash.hpp"
+
 namespace zaf {
 template<size_t N, typename Arg, typename ... ArgT>
 struct ArgumentTypeAt {
@@ -17,6 +19,7 @@ struct ArgumentTypeAt<0, Arg, ArgT ...> {
 template<typename ... ArgT>
 struct ArgumentsSignature {
   constexpr static size_t size = sizeof ... (ArgT);
+  static size_t hash_code() { return hash_combine(typeid(ArgT).hash_code() ...); }
 
   template<size_t N>
   using arg_t = typename ArgumentTypeAt<N, ArgT ...>::type;
@@ -28,6 +31,7 @@ struct ArgumentsSignature {
 template<>
 struct ArgumentsSignature<> {
   inline const static size_t size = 0;
+  inline static size_t hash_code() { return hash_combine(); }
 };
 
 template<typename RetType, typename ... ArgT>

@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
   zaf::ActorSystem system;
   std::vector<zaf::Actor> senders, receivers;
   for (int i = 0; i < n_send; i++) {
-    senders.emplace_back(system.spawn([=](auto& self) {
+    senders.emplace_back(system.spawn([=](zaf::ActorBehavior& self) {
       self.receive_once({
         zaf::Code{0} - [n_send, n_recv, n_msg, &self](const std::vector<zaf::Actor>& receivers) {
           for (int i = 0; i < n_msg; i++) {
@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     }));
   }
   for (int i = 0; i < n_recv; i++) {
-    receivers.emplace_back(system.spawn([=](auto& self) {
+    receivers.emplace_back(system.spawn([=](zaf::ActorBehavior& self) {
       int num_termination = 0;
       int num_msg_recv = 0;
       self.receive({

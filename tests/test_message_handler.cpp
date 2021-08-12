@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 
-#include "zaf/message_handler.hpp"
+#include "zaf/message_handlers.hpp"
 
 #include "gtest/gtest.h"
 
@@ -103,4 +103,12 @@ GTEST_TEST(MessageHandler, HandlersWithObjArgs) {
   }
 }
 
+GTEST_TEST(MessageHandler, TypeMismatch) {
+  MessageHandlers handlers = {
+    zaf::Code{0} - [&](const std::string& x) {}
+  };
+  auto m = make_message(0, "123");
+  EXPECT_ANY_THROW(handlers.process(*m));
+  delete m;
+}
 } // namespace zaf

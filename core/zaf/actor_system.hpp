@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <thread>
 #include <type_traits>
 
@@ -23,20 +24,31 @@ public:
   // ActorSystem(ActorSystem&&);
   // ActorSystem& operator=(ActorSystem&&);
 
-  ScopedActor create_scoped_actor() override;
+  void init_scoped_actor(ActorBehavior&) override;
 
   using ActorGroup::spawn;
   Actor spawn(ActorBehavior* new_actor) override;
 
-  template<typename Runnable,
-    std::enable_if_t<std::is_invocable_v<Runnable, ActorBehavior&>>* = nullptr>
-  Actor spawn(Runnable&& runnable) {
-    auto new_actor = new ActorBehavior();
+  template<typename Callable,
+    typename Signature = traits::is_callable<Callable>,
+    typename std::enable_if_t<Signature::value>* = nullptr,
+    typename std::enable_if_t<Signature::args_t::size == 1>* = nullptr,
+    typename ActorType = typename Signature::args_t::template decay_arg_t<0>,
+    typename std::enable_if_t<std::is_base_of_v<ActorBehavior, ActorType>>* = nullptr>
+  Actor spawn(Callable&& callable) {
+    auto new_actor = new ActorType();
     new_actor->initialize_actor(*this, *this);
     // only after initialize_actor we get the actor id.
     auto new_actor_id = new_actor->get_actor_id();
-    std::thread([run = std::forward<Runnable>(runnable), new_actor]() mutable {
-      run(*new_actor);
+    std::thread([run = std::forward<Callable>(callable), new_actor]() mutable {
+      try {
+        run(*new_actor);
+      } catch (const std::exception& e) {
+        std::cerr << "Exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+        print_exception(e);
+      } catch (...) {
+        std::cerr << "Unknown exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+      }
       delete new_actor;
     }).detach();
     return {new_actor_id};
@@ -45,6 +57,10 @@ public:
   zmq::context_t& get_zmq_context();
 
   ActorIdType get_next_available_actor_id();
+
+  void set_identifier(const std::string&);
+
+  const std::string& get_identifier() const;
 
   ~ActorSystem();
 
@@ -55,6 +71,9 @@ private:
 
   // Available actor id starts from 1. Actor id 0 means null actor.
   std::atomic<ActorIdType> next_available_actor_id{1};
+
+  // identifier should be different when communicating with other ActorSystems
+  std::string identifier = "zaf";
 
   zmq::context_t zmq_context;
 };

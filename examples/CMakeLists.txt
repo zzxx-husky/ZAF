@@ -11,5 +11,6 @@ endmacro()
 
 add(HelloWorld hello_world.cpp)
 add(HelloWorldByActorEngine hello_world_by_actor_engine.cpp)
+add(HelloWorldNetwork hello_world_network.cpp)
 add(LoadRebalance load_rebalance.cpp)
 add(Shuffle shuffle.cpp)

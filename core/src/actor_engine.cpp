@@ -1,4 +1,5 @@
 #include "zaf/actor_engine.hpp"
+#include "zaf/zaf_exception.hpp"
 
 #include "zmq.hpp"
 
@@ -11,8 +12,8 @@ Actor ActorEngine::spawn(ActorBehavior* new_actor) {
   return {new_actor_id};
 }
 
-ScopedActor ActorEngine::create_scoped_actor() {
-  return forwarder->get_actor_system().create_scoped_actor();
+void ActorEngine::init_scoped_actor(ActorBehavior& new_actor) {
+  return forwarder->get_actor_system().init_scoped_actor(new_actor);
 }
 
 void ActorEngine::set_load_diff_ratio(double ratio) {
@@ -29,7 +30,7 @@ ActorEngine::ActorEngine(ActorSystem& actor_system, size_t num_executors) {
 
 void ActorEngine::initialize(ActorSystem& actor_system, size_t num_executors) {
   if (this->num_executors != 0) {
-    throw std::runtime_error("Attempt to initialize an active ActorEngine.");
+    throw ZAFException("Attempt to initialize an active ActorEngine.");
   }
   this->num_executors = num_executors;
   this->forwarder = actor_system.create_scoped_actor();
@@ -158,13 +159,26 @@ void ActorEngine::Executor::launch() {
   this->activate();
   while (true) {
     // block until receive a message
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     int npoll = zmq::poll(poll_items);
+#pragma GCC diagnostic pop
     if (npoll == 0) {
       continue;
     }
     for (size_t i = 0; i < num_poll_items; i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        actors[i]->receive_once(handlers[i]);
+        try {
+          actors[i]->receive_once(handlers[i]);
+        } catch (const std::exception& e) {
+          std::cerr << "Exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+          print_exception(e);
+          actors[i]->deactivate();
+        } catch (...) {
+          std::cerr << "Unknown exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+          actors[i]->deactivate();
+        }
+
         if (!actors[i]->is_activated() && i != 0) {
           actors[i]->stop();
           engine.dec_num_alive_actors();

@@ -20,7 +20,7 @@ public:
 
   using ActorGroup::spawn;
   Actor spawn(ActorBehavior* new_actor) override;
-  ScopedActor create_scoped_actor() override;
+  void init_scoped_actor(ActorBehavior&) override;
 
   void set_load_diff_ratio(double ratio);
   void set_load_rebalance_period(size_t period);
@@ -60,7 +60,7 @@ private:
 
   size_t num_executors = 0, next_executor = 0;
   std::vector<Actor> executors;
-  ScopedActor forwarder;
+  ScopedActor<ActorBehavior> forwarder;
 
   // for load rebalance
   struct {

@@ -3,7 +3,8 @@
 #include <cstdint>
 
 #include "actor.hpp"
-#include "message_handler.hpp"
+#include "message_handlers.hpp"
+#include "zaf_exception.hpp"
 
 #include "zmq.hpp"
 
@@ -13,7 +14,7 @@ class ActorGroup;
 
 class ActorBehavior {
 public:
-  ActorBehavior();
+  ActorBehavior() = default;
 
   /**
    * To be overrided by subclass
@@ -27,12 +28,7 @@ public:
    **/
   template<typename ... ArgT>
   inline void reply(size_t code, ArgT&& ... args) {
-    this->send(this->get_current_sender_actor_id(), code, std::forward<ArgT>(args)...);
-  }
-
-  template<typename ... ArgT>
-  inline void send(const Actor& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver.get_actor_id(), code, std::forward<ArgT>(args)...);
+    this->send(this->get_current_message().get_sender_actor(), code, std::forward<ArgT>(args)...);
   }
 
   template<typename ... ArgT>
@@ -41,51 +37,57 @@ public:
   }
 
   template<typename ... ArgT>
-  void send(ActorIdType receiver_id, size_t code, ArgT&& ... args) {
-    if (!receiver_id) {
+  inline void send(const Actor& receiver, size_t code, ArgT&& ... args) {
+    if (!receiver) {
       return; // ignore message sent to null actor
     }
-    if (connected_receivers.insert(receiver_id).second) {
-      // newly inserted
-      connect_to(receiver_id);
-    }
-    auto recv_routing_id = get_routing_id(receiver_id, false);
-    try {
-      send_socket.send(zmq::buffer(recv_routing_id), zmq::send_flags::sndmore);
-    } catch (...) {
-      LOG(ERROR) << "Failed to send a multi-part zmq message for receiver routing id:\n"
-        << "  from sender: " << this->actor_id << '\n'
-        << "  to receiver: " << receiver_id << '\n'
-        << "  receiver routing id: " << recv_routing_id;
-      throw;
-    }
-    try {
-      // the Message*
-      Message* message = make_message(code, std::forward<ArgT>(args)...);
-      send_socket.send(zmq::const_buffer(&message, sizeof(message)));
-    } catch (...) {
-      LOG(ERROR) << "Exception caught when sending a message in actor " << this->actor_id;
-      LOG_IF(ERROR, !bool(send_socket)) <<
-        "Attempt to send message before sockets are setup.";
-      throw;
-    }
+    receiver.visit(overloaded {
+      [&](const LocalActorHandle& r) {
+        auto message = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+        this->send(r, message);
+      },
+      [&](const RemoteActorHandle& r) {
+        if constexpr (traits::all_serializable<ArgT ...>::value) {
+          std::vector<char> bytes;
+          Serializer(bytes)
+            .write(this->get_actor_id())
+            .write(r.remote_actor_id)
+            .write(code)
+            .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
+            .write(std::forward<ArgT>(args) ...);
+          // Have to copy the bytes here because we do not know how many bytes
+          // are needed for serialization and we need to reserve more than necessary.
+          this->send(r.net_sender_id, DefaultCodes::ForwardMessage,
+            zmq::message_t{&bytes.front(), bytes.size()});
+        } else {
+          throw ZAFException("Attempt to serialize non-serializable data");
+        }
+      }
+    });
   }
+
+  template<typename ... ArgT>
+  void send(const LocalActorHandle& receiver, size_t code, ArgT&& ... args) {
+    auto m = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+    this->send(receiver, m);
+  }
+
+  void send(const LocalActorHandle& receiver, Message* m);
 
   // to process one incoming message with message handlers
   bool receive_once(MessageHandlers&& handlers, bool non_blocking = false);
   bool receive_once(MessageHandlers& handlers, bool non_blocking = false);
-  void receive(MessageHandlers&& handlers, bool non_blocking = false);
-  void receive(MessageHandlers& handlers, bool non_blocking = false);
+  bool receive_once(MessageHandlers&& handlers, const std::chrono::milliseconds&);
+  bool receive_once(MessageHandlers& handlers, const std::chrono::milliseconds&);
+  void receive(MessageHandlers&& handlers);
+  void receive(MessageHandlers& handlers);
 
   ActorSystem& get_actor_system();
-
   ActorGroup& get_actor_group();
-
-  ActorIdType get_current_sender_actor_id() const;
-
-  Actor get_current_sender_actor() const;
-
   Actor get_self_actor();
+
+  Message& get_current_message();
+  Actor get_current_sender_actor();
 
   void activate();
   void deactivate();
@@ -94,9 +96,19 @@ public:
   /**
    * To be used by ZAF
    **/
-  void initialize_actor(ActorSystem& sys, ActorGroup& group);
+  virtual void initialize_actor(ActorSystem& sys, ActorGroup& group);
+  virtual void terminate_actor();
+
+  void initialize_routing_id_buffer();
+
+  virtual void initialize_recv_socket();
+  virtual void terminate_recv_socket();
+
+  virtual void initialize_send_socket();
+  virtual void terminate_send_socket();
 
   zmq::socket_t& get_recv_socket();
+  zmq::socket_t& get_send_socket();
 
   virtual void launch();
 
@@ -104,20 +116,21 @@ public:
 
   ActorIdType get_actor_id() const;
 
-private:
-  void connect_to(ActorIdType peer);
-
-  const std::string& get_routing_id(ActorIdType id, bool send_or_recv);
-
-  ActorIdType actor_id;
+protected:
+  void connect(ActorIdType peer);
+  void disconnect(ActorIdType peer);
 
   std::string routing_id_buffer;
+  const std::string& get_routing_id(ActorIdType id, bool send_or_recv);
 
-  ActorSystem* actor_system_ptr = nullptr;
-  ActorGroup* actor_group_ptr = nullptr;
-  zmq::socket_t send_socket, recv_socket;
-  zmq::message_t current_sender_routing_id;
-  bool activated = false;
   DefaultHashSet<ActorIdType> connected_receivers;
+  bool activated = false;
+  zmq::message_t current_sender_routing_id;
+  Message* current_message = nullptr;
+
+  ActorIdType actor_id;
+  zmq::socket_t send_socket, recv_socket;
+  ActorGroup* actor_group_ptr = nullptr;
+  ActorSystem* actor_system_ptr = nullptr;
 };
 } // namespace zaf
