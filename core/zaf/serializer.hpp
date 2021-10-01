@@ -79,7 +79,7 @@ T Deserializer::read() {
 
 template<typename T>
 Deserializer& Deserializer::read(T& t) {
-  deserialize<T>(*this, t);
+  deserialize(*this, t);
   return *this;
 }
 

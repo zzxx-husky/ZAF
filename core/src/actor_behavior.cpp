@@ -21,11 +21,11 @@ Actor ActorBehavior::get_self_actor() {
   return {this->actor_id};
 }
 
-Message& ActorBehavior::get_current_message() {
+Message& ActorBehavior::get_current_message() const {
   return *this->current_message;
 }
 
-Actor ActorBehavior::get_current_sender_actor() {
+Actor ActorBehavior::get_current_sender_actor() const {
   return this->current_message
     ? this->current_message->get_sender_actor()
     : Actor{};
@@ -81,36 +81,20 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, bool non_blocking) 
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, bool non_blocking) {
-  try {
-    if (!recv_socket.recv(current_sender_routing_id,
-        non_blocking ? zmq::recv_flags::dontwait : zmq::recv_flags::none)) {
-      return false;
+  return this->receive_once([&](Message* m) {
+    this->current_message = m;
+    try {
+      handlers.process(*m);
+    } catch (...) {
+      std::throw_with_nested(ZAFException(
+        "Exception caught when processing a message with code ", m->get_code()
+      ));
     }
-    zmq::message_t message_ptr;
-    if (!recv_socket.recv(message_ptr)) {
-      throw ZAFException(
-        "Failed to receive a message after receiving an routing id at ", __PRETTY_FUNCTION__
-      );
-    }
-    {
-      this->current_message = *reinterpret_cast<Message**>(message_ptr.data());
-      try {
-        handlers.process(*this->current_message);
-      } catch (...) {
-        std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", this->current_message->get_code()
-        ));
-      }
+    if (this->current_message) {
       delete this->current_message;
-      this->current_message = nullptr;
     }
-    current_sender_routing_id.rebuild();
-    return true;
-  } catch (...) {
-    std::throw_with_nested(ZAFException(
-      "Exception caught in ", __PRETTY_FUNCTION__, " in actor ", this->actor_id
-    ));
-  }
+    this->current_message = nullptr;
+  }, long(non_blocking ? 0 : -1));
 }
 
 bool ActorBehavior::receive_once(MessageHandlers&& handlers, const std::chrono::milliseconds& timeout) {
@@ -118,45 +102,20 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, const std::chrono::
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, const std::chrono::milliseconds& timeout) {
-  try {
-    zmq::pollitem_t item[1] = {
-      {recv_socket.handle(), 0, ZMQ_POLLIN, 0}
-    };
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    int npoll = zmq::poll(item, 1, timeout);
-#pragma GCC diagnostic pop
-    if (npoll == 0) {
-      return false;
+  return this->receive_once([&](Message* m) {
+    this->current_message = m;
+    try {
+      handlers.process(*m);
+    } catch (...) {
+      std::throw_with_nested(ZAFException(
+        "Exception caught when processing a message with code ", m->get_code()
+      ));
     }
-    if (!recv_socket.recv(current_sender_routing_id)) {
-      throw ZAFException("Expect to receive a message but actually receive nothing.");
-    }
-    zmq::message_t message_ptr;
-    if (!recv_socket.recv(message_ptr)) {
-      throw ZAFException(
-        "Failed to receive a message after receiving an routing id at ", __PRETTY_FUNCTION__
-      );
-    }
-    {
-      this->current_message = *reinterpret_cast<Message**>(message_ptr.data());
-      try {
-        handlers.process(*this->current_message);
-      } catch (...) {
-        std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", this->current_message->get_code()
-        ));
-      }
+    if (this->current_message) {
       delete this->current_message;
-      this->current_message = nullptr;
     }
-    current_sender_routing_id.rebuild();
-    return true;
-  } catch (...) {
-    std::throw_with_nested(ZAFException(
-      "Exception caught in ", __PRETTY_FUNCTION__, " in actor ", this->actor_id
-    ));
-  }
+    this->current_message = nullptr;
+  }, static_cast<long>(timeout.count()));
 }
 
 void ActorBehavior::receive(MessageHandlers&& handlers) {
@@ -297,5 +256,37 @@ const std::string& ActorBehavior::get_routing_id(ActorIdType id, bool send_or_re
   }
   routing_id_buffer.back() = send_or_recv ? 's' : 'r';
   return routing_id_buffer;
+}
+
+void ActorBehavior::RequestHelper::on_reply(MessageHandlers&& handlers) {
+  this->on_reply(handlers);
+}
+
+// Note: need to store the current status of ActorBehavior and create a new round of `receive`
+void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
+  ++self.waiting_for_response;
+  auto cur_act = self.is_activated();
+  self.receive([&](Message* m) {
+    if (m->get_type() == Message::Type::Response) {
+      auto cur_msg = self.current_message;
+      self.current_message = m;
+      try {
+        handlers.process(*m);
+      } catch (...) {
+        std::throw_with_nested(ZAFException(
+          "Exception caught when processing a message with code ", m->get_code()
+        ));
+      }
+      if (self.current_message) {
+        delete self.current_message;
+      }
+      self.current_message = cur_msg;
+      self.deactivate();
+    } else {
+      self.pending_messages.push_back(m);
+    }
+  });
+  if (cur_act) { self.activate(); }
+  --self.waiting_for_response;
 }
 } // namespace zaf

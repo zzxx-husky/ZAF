@@ -130,7 +130,7 @@ void deserialize(Deserializer& s, Iterable& it) {
     } else {
       throw ZAFException("Failed to deserialize items from the Iterable object:"
         " Possibly the Iterable object does not provide emplace_back, empalce or insert method for insertion."
-        "Or the item is not deserializable");
+        " Or the item is not deserializable");
     }
   }
 }
@@ -156,14 +156,12 @@ std::pair<A, B> deserialize(Deserializer& s) {
 }
 
 // 5. Serialization for std::string to write all the bytes together
-template<typename T>
-void serialize(Serializer& s, const std::basic_string<T>& str) {
+inline void serialize(Serializer& s, const std::string& str) {
   s.write_pod(size_t(str.size()));
   s.write_bytes(str.data(), str.size());
 }
 
-template<typename T>
-void deserialize(Deserializer& s, std::basic_string<T>& str) {
+inline void deserialize(Deserializer& s, std::string& str) {
   str.resize(s.read<size_t>());
   s.read_bytes(str.data(), str.size());
 }

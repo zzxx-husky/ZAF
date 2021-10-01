@@ -33,7 +33,7 @@ private:
   template<typename CodeHandler, typename ... ArgT>
   void add_handlers(CodeHandler&& code_handler, ArgT&& ... args) {
     if (!handlers.emplace(std::move(code_handler)).second) {
-      throw ZAFException("Message handler code conflicts with a previous handler.");
+      throw ZAFException("Message handler code conflicts with a previous handler. Code: ", code_handler.first);
     }
     add_handlers(std::forward<ArgT>(args) ...);
   }
@@ -42,6 +42,4 @@ private:
 
   DefaultHashMap<size_t, std::unique_ptr<MessageHandler>> handlers;
 };
-
-
 } // namespace zaf

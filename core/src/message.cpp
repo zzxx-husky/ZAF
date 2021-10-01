@@ -7,9 +7,13 @@ namespace zaf {
 Message::Message(const Actor& sender_actor, size_t code):
   sender_actor(sender_actor),
   code(code) {
-} 
+}
 
 size_t Message::get_code() const { return code; }
+
+void Message::set_type(Message::Type t) { this->type = t; }
+
+Message::Type Message::get_type() const { return type; }
 
 const Actor& Message::get_sender_actor() const { return sender_actor; }
 
@@ -28,16 +32,21 @@ void SerializedMessage::fill_with_element_addrs(std::vector<std::uintptr_t>&) co
 }
 
 TypedSerializedMessage<std::vector<char>>::TypedSerializedMessage(
-  const Actor& sender_actor, size_t code, size_t types_hash, std::vector<char>&& bytes, size_t offset):
+  const Actor& sender_actor, size_t code, Type type, size_t types_hash, std::vector<char>&& bytes, size_t offset):
   SerializedMessage(sender_actor, code),
   content_bytes(std::move(bytes)),
   offset(offset),
   types_hash(types_hash) {
+  this->set_type(type);
 }
 
 SerializedMessage* TypedSerializedMessage<std::vector<char>>::serialize() const {
   return new TypedSerializedMessage<std::vector<char>> {
-    this->get_sender_actor(), this->get_code(), this->types_hash_code(), std::vector<char>{this->content_bytes}
+    this->get_sender_actor(),
+    this->get_code(),
+    this->get_type(),
+    this->types_hash_code(),
+    std::vector<char>{this->content_bytes}
   };
 }
 
@@ -50,17 +59,19 @@ size_t TypedSerializedMessage<std::vector<char>>::types_hash_code() const {
 }
 
 TypedSerializedMessage<zmq::message_t>::TypedSerializedMessage(
-  const Actor& sender_actor, size_t code, size_t types_hash, zmq::message_t&& bytes, size_t offset):
+  const Actor& sender_actor, size_t code, Type type, size_t types_hash, zmq::message_t&& bytes, size_t offset):
   SerializedMessage(sender_actor, code),
   message_bytes(std::move(bytes)),
   offset(offset),
   types_hash(types_hash) {
+  this->set_type(type);
 }
 
 SerializedMessage* TypedSerializedMessage<zmq::message_t>::serialize() const {
   return new TypedSerializedMessage<zmq::message_t> {
     this->get_sender_actor(),
     this->get_code(),
+    this->get_type(),
     this->types_hash_code(),
     zmq::message_t{
       (char*) this->message_bytes.data() + this->offset,

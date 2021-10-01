@@ -39,6 +39,10 @@ public:
     return *actor;
   }
 
+  operator bool() const {
+    return bool(actor);
+  }
+
 private:
   std::unique_ptr<ActorType> actor = nullptr;
 };

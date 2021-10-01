@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actor.hpp"
 #include "actor_system.hpp"
 #include "scoped_actor.hpp"
 #include "thread_based_actor_behavior.hpp"
@@ -16,24 +17,27 @@ namespace zaf {
  **/
 class NetGate {
 public:
-  constexpr static Code NetGateConnReq{1};
-  constexpr static Code DataConnReq{2};
-  constexpr static Code Termination{3};
-  constexpr static Code ActorRegistration{5};
-  constexpr static Code ActorLookupReq{6};
-  constexpr static Code ActorLookupRep{7};
-  constexpr static Code RemoteActorLookupRep{8};
-  constexpr static Code RemoteActorLookupReq{9};
-  constexpr static Code BindPortReq{10};
-  constexpr static Code BindPortRep{11};
-  constexpr static Code Ping{12};
-  constexpr static Code Pong{13};
-  constexpr static Code PingRetry{14};
+  constexpr static size_t NetGateCodeBase = (size_t(~0u) - 1) << (sizeof(size_t) << 2);
+  constexpr static Code NetGateConnReq        {NetGateCodeBase + 1};
+  constexpr static Code DataConnReq           {NetGateCodeBase + 2};
+  constexpr static Code Termination           {NetGateCodeBase + 3};
+  constexpr static Code ActorRegistration     {NetGateCodeBase + 5};
+  constexpr static Code ActorLookupReq        {NetGateCodeBase + 6};
+  constexpr static Code ActorLookupRep        {NetGateCodeBase + 7};
+  constexpr static Code RemoteActorLookupRep  {NetGateCodeBase + 8};
+  constexpr static Code RemoteActorLookupReq  {NetGateCodeBase + 9};
+  constexpr static Code BindPortReq           {NetGateCodeBase + 10};
+  constexpr static Code BindPortRep           {NetGateCodeBase + 11};
+  constexpr static Code Ping                  {NetGateCodeBase + 12};
+  constexpr static Code Pong                  {NetGateCodeBase + 13};
+  constexpr static Code PingRetry             {NetGateCodeBase + 14};
+  constexpr static Code RetrieveActorReq      {NetGateCodeBase + 15};
+  constexpr static Code RetrieveActorRep      {NetGateCodeBase + 16};
 
 private:
   class Receiver : public ActorBehavior {
   public:
-    Receiver(Actor sender, const std::string& bind_host);
+    Receiver(const std::string bind_host, const NetSenderInfo& net_sender_info);
 
     MessageHandlers behavior() override;
 
@@ -47,7 +51,7 @@ private:
   private:
     const std::string bind_host;
     zmq::socket_t net_recv_socket;
-    Actor sender;
+    const NetSenderInfo& net_sender_info;
   };
 
   class Sender : public ActorBehavior {
@@ -58,6 +62,7 @@ private:
     void terminate_send_socket() override;
 
     std::string connected_url;
+    std::vector<zmq::message_t> pending_messages;
   };
 
   /**
@@ -82,6 +87,7 @@ private:
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
+        // not writing msg_type here because it only sends Message::Type::Normal messages
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
@@ -89,7 +95,7 @@ private:
         net_send_socket.send(zmq::buffer(ng_url + "/r"), zmq::send_flags::sndmore);
         net_send_socket.send(zmq::message_t{&bytes.front(), bytes.size()}, zmq::send_flags::none);
       } else {
-        conn.pending_messages.push_back(std::move(zmq::message_t{&bytes.front(), bytes.size()}));
+        conn.pending_messages.emplace_back(std::move(zmq::message_t{&bytes.front(), bytes.size()}));
       }
     }
 
@@ -100,6 +106,7 @@ private:
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
+        // not writing msg_type here because it only sends Message::Type::Normal messages
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
@@ -123,35 +130,42 @@ private:
     struct NetGateConn {
       Actor sender;
       Actor receiver;
+      NetSenderInfo net_sender_info;
+      // whether `pong` message is received, i.e., whether the connection is well established.
       bool is_ponged = false;
-      std::vector<zmq::message_t> pending_messages;
+      // remote actor name -> local actor requesters
       std::unordered_map<std::string, std::vector<Actor>> actor_lookup_requesters;
+      // a buffer storing messages that are pending and waiting for the `pong` message from peer net gate
+      std::vector<zmq::message_t> pending_messages;
+
+      NetGateConn() = default;
+      NetGateConn(NetGateConn&&) = default;
+      NetGateConn(const NetGateConn&) = delete;
     };
-    // net_gate urls to Sender/Receiver
+    // net_gate urls -> Sender/Receiver
     std::unordered_map<std::string, NetGateConn> net_gate_connections;
     struct LocalActor {
+      // local registered actor, requests may come before local actor is registered
       std::optional<Actor> actor;
+      // remote actor requesters
       std::vector<std::string> requesters;
     };
+    // name -> local actor
     std::unordered_map<std::string, LocalActor> local_registered_actors;
     zmq::message_t current_net_gate_routing_id;
-    // the host which NetGateActor and Receivers will bind
-    const std::string bind_host;
-    const int bind_port;
     // for communication with peer NetGateActors
     zmq::socket_t net_recv_socket;
     zmq::socket_t net_send_socket;
+    // this NetGateActor will listen to "tcp://bind_host:bind_port"
+    // Receivers will listen to "tcp://bind_host:*"
+    std::string bind_host;
+    int bind_port = 0;
   };
 
 public:
   NetGate() = default;
   NetGate(ActorSystem& actor_sys, const std::string& bind_host, int port);
 
-  // may return null
-  ActorSystem& get_actor_system();
-  const ActorSystem& get_actor_system() const;
-
-  // `url` in the format of "transport://address", e.g., "tcp://127.0.0.1:10086"
   void initialize(ActorSystem& actor_sys, const std::string& bind_host, int port);
   bool is_initialized() const;
   void terminate();
@@ -160,12 +174,10 @@ public:
 
   void register_actor(const std::string& name, const Actor& actor);
 
-  operator Actor() const;
   Actor actor() const;
 
 private:
   Actor net_gate_actor = nullptr;
   ScopedActor<ActorBehavior> self = nullptr;
-  ActorSystem* actor_sys = nullptr;
 };
 } // namespace zaf

@@ -68,7 +68,7 @@ void ThreadBasedActorBehavior::flush_delayed_messages() {
       },
       [&](zmq::message_t& m) {
         RemoteActorHandle& r = msg.receiver;
-        this->send(LocalActorHandle{r.net_sender_id}, DefaultCodes::ForwardMessage, std::move(m));
+        this->send(LocalActorHandle{r.net_sender_info->id}, DefaultCodes::ForwardMessage, std::move(m));
       }
     }, msg.message);
     delayed_messages.erase(delayed_messages.begin());

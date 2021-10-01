@@ -16,11 +16,21 @@ class SerializedMessage;
 
 class Message {
 public:
+  enum Type : uint8_t {
+    Normal = 0,
+    Request = 1,
+    Response = 2
+  };
+
   Message(const Actor& sender_actor, size_t code);
 
   size_t get_code() const;
 
   const Actor& get_sender_actor() const;
+
+  void set_type(Type);
+
+  Type get_type() const;
 
   virtual size_t types_hash_code() const = 0;
 
@@ -34,6 +44,7 @@ public:
 
 private:
   size_t code;
+  Type type = Normal;
   Actor sender_actor;
 };
 
@@ -108,7 +119,10 @@ public:
   template<typename ArgTypes>
   inline auto deseralize() {
     auto&& content = this->deserialize_content<ArgTypes>();
-    return new TypedMessage<decltype(content)>(this->get_sender_actor(), this->code, std::move(content));
+    auto m = new TypedMessage<decltype(content)>(
+      this->get_sender_actor(), this->code, std::move(content));
+    m->set_type(this->get_type());
+    return m;
   }
 
   template<typename ArgTypes>
@@ -137,7 +151,8 @@ struct TypedSerializedMessage;
 template<>
 struct TypedSerializedMessage<std::vector<char>> : public SerializedMessage {
 public:
-  TypedSerializedMessage(const Actor& sender_actor, size_t code, size_t types_hash, std::vector<char>&& bytes, size_t offset = 0);
+  TypedSerializedMessage(const Actor& sender_actor,
+    size_t code, Type type, size_t types_hash, std::vector<char>&& bytes, size_t offset = 0);
 
   SerializedMessage* serialize() const override;
 
@@ -154,7 +169,8 @@ private:
 template<>
 struct TypedSerializedMessage<zmq::message_t> : public SerializedMessage {
 public:
-  TypedSerializedMessage(const Actor& sender_actor, size_t code, size_t types_hash, zmq::message_t&& bytes, size_t offset = 0);
+  TypedSerializedMessage(const Actor& sender_actor,
+    size_t code, Type type, size_t types_hash, zmq::message_t&& bytes, size_t offset = 0);
 
   SerializedMessage* serialize() const override;
 
@@ -175,7 +191,7 @@ SerializedMessage* TypedMessage<MessageContent>::serialize() const {
     Serializer s(bytes);
     serialize_elems(s, std::make_index_sequence<std::tuple_size<MessageContent>::value>{});
     return new TypedSerializedMessage<std::vector<char>>{
-      this->get_sender_actor(), this->get_code(), this->types_hash_code(), std::move(bytes)
+      this->get_sender_actor(), this->get_code(), this->get_type(), this->types_hash_code(), std::move(bytes)
     };
   } else {
     throw ZAFException("The TypedMessage contains non-serializable element(s) but is required to be serialized.");
