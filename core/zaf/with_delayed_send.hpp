@@ -5,14 +5,16 @@
 #include "actor_behavior.hpp"
 
 namespace zaf {
-class ThreadBasedActorBehavior : public ActorBehavior {
+class WithDelayedSend {
 public:
-  void launch() override;
+  WithDelayedSend(ActorBehavior& self);
+
+  void launch();
   // dont want to make receive / receive_once virtual, so override all of them.
   void receive(MessageHandlers&& handlers);
   void receive(MessageHandlers& handlers);
-  void receive_once(MessageHandlers&& handlers);
-  void receive_once(MessageHandlers& handlers);
+  bool receive_once(MessageHandlers&& handlers);
+  bool receive_once(MessageHandlers& handlers);
 
 protected:
   using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
@@ -39,12 +41,24 @@ public:
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
     size_t code, ArgT&& ... args) {
-    this->delayed_send(delay, LocalActorHandle{receiver.get_actor_id()}, code, std::forward<ArgT>(args) ...);
+    this->delayed_send(delay, LocalActorHandle{receiver.get_actor_id()}, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  }
+
+  template<typename Rep, typename Period, typename ... ArgT>
+  void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
+    size_t code, Message::Type type, ArgT&& ... args) {
+    this->delayed_send(delay, LocalActorHandle{receiver.get_actor_id()}, code, type, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
     size_t code, ArgT&& ... args) {
+    this->delayed_send(delay, receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  }
+
+  template<typename Rep, typename Period, typename ... ArgT>
+  void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
+    size_t code, Message::Type type, ArgT&& ... args) {
     if (!receiver) {
       return;
     }
@@ -52,18 +66,18 @@ public:
     auto send_time = now + delay;
     receiver.visit(overloaded{
       [&](const LocalActorHandle& r) {
-        delayed_messages.emplace(send_time, DelayedMessage(
-          receiver,
-          make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...)
-        ));
+        auto m = make_message(LocalActorHandle{self.get_actor_id()}, code, std::forward<ArgT>(args)...);
+        m->set_type(type);
+        delayed_messages.emplace(send_time, DelayedMessage(receiver, m));
       },
       [&](const RemoteActorHandle& r) {
         if constexpr (traits::all_serializable<ArgT ...>::value) {
           std::vector<char> bytes;
           Serializer(bytes)
-            .write(this->get_actor_id())
+            .write(self.get_actor_id())
             .write(r.remote_actor_id)
             .write(code)
+            .write(type)
             .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
             .write(std::forward<ArgT>(args) ...);
           delayed_messages.emplace(send_time, DelayedMessage(
@@ -79,5 +93,6 @@ public:
 
 private:
   DefaultSortedMultiMap<TimePoint, DelayedMessage> delayed_messages;
+  ActorBehavior& self;
 };
 } // namespace zaf

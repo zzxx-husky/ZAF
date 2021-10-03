@@ -3,7 +3,7 @@
 #include "actor.hpp"
 #include "actor_system.hpp"
 #include "scoped_actor.hpp"
-#include "thread_based_actor_behavior.hpp"
+#include "with_delayed_send.hpp"
 
 namespace zaf {
 /**
@@ -72,8 +72,11 @@ private:
    * The key stored in peer's map: a.b.c.d:port
    * The url that Receivers created by this NetGateActor bind is a.b.c.d:*
    **/
-  class NetGateActor : public ThreadBasedActorBehavior {
+  class NetGateActor : public ActorBehavior, public WithDelayedSend {
   public:
+    using WithDelayedSend::receive;
+    using WithDelayedSend::receive_once;
+
     NetGateActor(const std::string& host, int port);
 
     MessageHandlers behavior() override;
