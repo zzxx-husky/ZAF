@@ -27,12 +27,18 @@ jobs:
         ${{github.workspace}}/scripts/install_gtest.sh
         ${{github.workspace}}/scripts/install_glog.sh
         ${{github.workspace}}/scripts/install_phmap.sh
+        source ~/.bashrc
+        echo ${ZMQ_ROOT}
+        echo ${GTEST_ROOT}
+        echo ${GLOG_ROOT}
+        echo ${PHMAP_ROOT}
+        cp ~/.bashrc ${{github.workspace}}/scripts/
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: |
-        source ~/.bashrc
+        source ${{github.workspace}}/scripts/.bashrc
         echo ${ZMQ_ROOT}
         echo ${GTEST_ROOT}
         echo ${GLOG_ROOT}
