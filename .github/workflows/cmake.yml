@@ -31,11 +31,6 @@ jobs:
         ${{github.workspace}}/scripts/install_gtest.sh
         ${{github.workspace}}/scripts/install_glog.sh
         ${{github.workspace}}/scripts/install_phmap.sh
-        tail ~/.bashrc -n 12
-        tail ${HOME}/.bashrc -n 12
-        ls ~
-        ls ${HOME}
-        ls ${{github.workspace}}/scripts/
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
