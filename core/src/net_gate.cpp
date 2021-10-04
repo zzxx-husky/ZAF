@@ -133,7 +133,6 @@ void NetGate::Sender::terminate_send_socket() {
 }
 
 NetGate::NetGateActor::NetGateActor(const std::string& host, int port):
-  WithDelayedSend(static_cast<ActorBehavior&>(*this)),
   bind_host(host),
   bind_port(port) {
 }

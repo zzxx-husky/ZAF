@@ -20,4 +20,27 @@ GTEST_TEST(ActorBehavior, Basic) {
     }
   });
 }
+
+GTEST_TEST(ActorBehavior, DelayedSendWithReceiveTimeout) {
+  ActorSystem actor_system;
+
+  auto a = actor_system.spawn([&](ActorBehavior& self) {
+    self.delayed_send(std::chrono::seconds{1}, self, Code{0});
+    bool received = false;
+    for (int i = 0; i < 4; i++) {
+      self.receive_once({
+        Code{0} - [&]() {
+          received = true;
+        }
+      }, std::chrono::milliseconds{200});
+      EXPECT_FALSE(received);
+    }
+    self.receive_once({
+      Code{0} - [&]() {
+        received = true;
+      }
+    }, std::chrono::milliseconds{210});
+    EXPECT_TRUE(received);
+  });
+}
 } // namespace zaf

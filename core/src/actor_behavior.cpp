@@ -3,6 +3,16 @@
 #include "zaf/zaf_exception.hpp"
 
 namespace zaf {
+ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, Message* m):
+  receiver(r),
+  message(m) {
+}
+
+ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, zmq::message_t&& m):
+  receiver(r),
+  message(std::move(m)) {
+}
+
 void ActorBehavior::start() {}
 
 void ActorBehavior::stop() {}
@@ -81,20 +91,7 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, bool non_blocking) 
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, bool non_blocking) {
-  return this->receive_once([&](Message* m) {
-    this->current_message = m;
-    try {
-      handlers.process(*m);
-    } catch (...) {
-      std::throw_with_nested(ZAFException(
-        "Exception caught when processing a message with code ", m->get_code()
-      ));
-    }
-    if (this->current_message) {
-      delete this->current_message;
-    }
-    this->current_message = nullptr;
-  }, long(non_blocking ? 0 : -1));
+  return this->receive_once(handlers, long(non_blocking ? 0 : -1));
 }
 
 bool ActorBehavior::receive_once(MessageHandlers&& handlers, const std::chrono::milliseconds& timeout) {
@@ -102,6 +99,14 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, const std::chrono::
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, const std::chrono::milliseconds& timeout) {
+  return this->receive_once(handlers, static_cast<long>(timeout.count()));
+}
+
+bool ActorBehavior::receive_once(MessageHandlers&& handlers, long timeout) {
+  return this->receive_once(handlers, timeout);
+}
+
+bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
   return this->receive_once([&](Message* m) {
     this->current_message = m;
     try {
@@ -115,7 +120,7 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, const std::chrono::m
       delete this->current_message;
     }
     this->current_message = nullptr;
-  }, static_cast<long>(timeout.count()));
+  }, timeout);
 }
 
 void ActorBehavior::receive(MessageHandlers&& handlers) {
@@ -288,5 +293,29 @@ void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
   });
   if (cur_act) { self.activate(); }
   --self.waiting_for_response;
+}
+
+std::optional<std::chrono::milliseconds> ActorBehavior::remaining_time_to_next_delayed_message() const {
+  return delayed_messages.empty()
+    ? std::nullopt
+    : std::optional(std::chrono::duration_cast<std::chrono::milliseconds>(delayed_messages.begin()->first - std::chrono::steady_clock::now()));
+}
+
+void ActorBehavior::flush_delayed_messages() {
+  while (!delayed_messages.empty() &&
+         delayed_messages.begin()->first <= std::chrono::steady_clock::now()) {
+    auto& msg = delayed_messages.begin()->second;
+    std::visit(overloaded{
+      [&](Message* m) {
+        LocalActorHandle& r = msg.receiver;
+        this->send(r, m);
+      },
+      [&](zmq::message_t& m) {
+        RemoteActorHandle& r = msg.receiver;
+        this->send(LocalActorHandle{r.net_sender_info->id}, DefaultCodes::ForwardMessage, std::move(m));
+      }
+    }, msg.message);
+    delayed_messages.erase(delayed_messages.begin());
+  }
 }
 } // namespace zaf

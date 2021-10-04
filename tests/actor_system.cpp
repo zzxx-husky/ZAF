@@ -1,5 +1,4 @@
 #include "zaf/actor_system.hpp"
-#include "zaf/with_delayed_send.hpp"
 
 #include "gtest/gtest.h"
 #include "glog/logging.h"
@@ -24,13 +23,6 @@ GTEST_TEST(ActorSystem, ScopedActor) {
   EXPECT_EQ(i, 1);
 }
 
-struct A : public ActorBehavior, public WithDelayedSend {
-  using WithDelayedSend::receive;
-  using WithDelayedSend::receive_once;
-
-  A(): WithDelayedSend(static_cast<ActorBehavior&>(*this)) {}
-};
-
 GTEST_TEST(ActorSystem, LambdaBasedActorCreation) {
   int z = 0;
   {
@@ -40,7 +32,7 @@ GTEST_TEST(ActorSystem, LambdaBasedActorCreation) {
         Code{0} - [&]() { x.reply(1); }
       });
     });
-    actor_system.spawn([&](A& x) {
+    actor_system.spawn([&](ActorBehavior& x) {
       LOG(INFO) << "Delay send for 1 second";
       x.delayed_send(std::chrono::seconds{1}, a, 0);
       x.receive_once({
@@ -69,7 +61,7 @@ GTEST_TEST(ActorSystem, Terminator) {
         }
       });
     });
-    actor_system.spawn([&](A& x) {
+    actor_system.spawn([&](ActorBehavior& x) {
       LOG(INFO) << "Delay send for 1 second";
       x.delayed_send(std::chrono::seconds{1}, x, 1);
       x.receive_once({
