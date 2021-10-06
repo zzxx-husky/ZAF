@@ -1,5 +1,8 @@
 # ZAF: ZeroMQ-based Actor Framework
 
+[![CMake](https://github.com/zzxx-husky/ZAF/actions/workflows/cmake.yml/badge.svg?branch=master)](https://github.com/zzxx-husky/ZAF/actions/workflows/cmake.yml)
+[![CodeQL](https://github.com/zzxx-husky/ZAF/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/zzxx-husky/ZAF/actions/workflows/codeql-analysis.yml)
+
 A ZMQ-based C++ actor framework.
 
 ZAF uses ZMQ Router socket for in-memory communication and ZMQ PUSH/PULL sockets for network communication among actors.
