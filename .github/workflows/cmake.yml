@@ -27,13 +27,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        ${{github.workspace}}/scripts/install_libzmq.sh
-        ${{github.workspace}}/scripts/install_gtest.sh
-        ${{github.workspace}}/scripts/install_glog.sh
-        ${{github.workspace}}/scripts/install_phmap.sh
+        ${{github.workspace}}/scripts/install_libzmq.sh ${{github.workspace}}/../
+        ${{github.workspace}}/scripts/install_gtest.sh ${{github.workspace}}/../
+        ${{github.workspace}}/scripts/install_glog.sh ${{github.workspace}}/../
+        ${{github.workspace}}/scripts/install_phmap.sh ${{github.workspace}}/../
 
     - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+      # Configure CMake in a 'release' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: |
         source ${HOME}/.bashrc
@@ -41,25 +41,43 @@ jobs:
         echo ${GTEST_ROOT}
         echo ${GLOG_ROOT}
         echo ${PHMAP_ROOT}
-        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake -B ${{github.workspace}}/release -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{github.workspace}}/release
       # Build your program with the given configuration
       run: make all -j4
 
     - name: Test
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{github.workspace}}/release
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ./tests/Tests
 
     - name: Examples
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{github.workspace}}/release
       run: |
+        echo "Run HelloWorld"
         ./examples/HelloWorld
+        echo "Run HelloWorldNetwork"
         ./examples/HelloWorldNetwork
+        echo "Run HelloWorldByActorEngine"
         ./examples/HelloWorldByActorEngine
+        echo "Run Shuffle"
         ./examples/Shuffle
+        echo "Run LoadRebalance"
         ./examples/LoadRebalance
+        echo "RUn ActorDelivery"
         ./examples/ActorDelivery
+
+    - name: BuildMini
+      run: |
+        cmake -B ${{github.workspace}}/release_mini -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_TEST=false -DENABLE_PHMAP=false
+        cd ${{github.workspace}}/release_mini
+        make all -j4
+        echo "Run HelloWorld"
+        ./examples/HelloWorld
+        echo "Run HelloWorldNetwork"
+        ./examples/HelloWorldNetwork
+        echo "Run HelloWorldByActorEngine"
+        ./examples/HelloWorldByActorEngine

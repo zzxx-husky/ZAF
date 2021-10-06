@@ -3,7 +3,11 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ZMQ_VERSION=v4.3.4
 CPPZMQ_VERSION=v4.7.1
 
-cd ${scriptdir}
+if [ ! -z "$1" ]; then
+  cd $1
+else
+  cd ${scriptdir}
+fi
 
 if [ ! -d ./libzmq/install ]; then
   if [ ! -d ./libzmq ]; then
@@ -24,7 +28,4 @@ if [ -z "$(cat ~/.bashrc | grep ZMQ_ROOT)" ]; then
   echo "export ZMQ_ROOT=$(pwd)/libzmq/install" >> ~/.bashrc
   echo "export LD_LIBRARY_PATH=\${ZMQ_ROOT}/lib:\${LD_LIBRARY_PATH}" >> ~/.bashrc
   echo "export CMAKE_PREFIX_PATH=\${ZMQ_ROOT}:\${CMAKE_PREFIX_PATH}" >> ~/.bashrc
-  source ~/.bashrc
 fi
-
-

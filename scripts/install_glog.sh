@@ -2,7 +2,11 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 GLOG_VERSION=v0.4.0
 
-cd ${scriptdir}
+if [ ! -z "$1" ]; then
+  cd $1
+else
+  cd ${scriptdir}
+fi
 
 if [ ! -d ./glog/install ]; then
   if [ ! -d ./glog ]; then
@@ -17,6 +21,4 @@ if [ -z "$(cat ~/.bashrc | grep GLOG_ROOT)" ]; then
   echo "export GLOG_ROOT=$(pwd)/glog/install" >> ~/.bashrc
   echo "export LD_LIBRARY_PATH=\${GLOG_ROOT}/lib:\${LD_LIBRARY_PATH}" >> ~/.bashrc
   echo "export CMAKE_PREFIX_PATH=\${GLOG_ROOT}:\${CMAKE_PREFIX_PATH}" >> ~/.bashrc
-  source ~/.bashrc
 fi
-

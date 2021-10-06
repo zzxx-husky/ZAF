@@ -185,7 +185,8 @@ void ActorEngine::Executor::launch() {
           delete actors[i];
           actors[i] = actors.back();
           actors.pop_back();
-          handlers[i] = std::move(handlers.back());
+          // using `handlers[i] = std::move(handlers.back());` calls seg fault in malloc/new
+          std::swap(handlers[i], handlers.back());
           handlers.pop_back();
           poll_items[i] = poll_items.back();
           poll_items.pop_back();

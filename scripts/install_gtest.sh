@@ -2,7 +2,11 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 GTEST_VERSION=release-1.10.0
 
-cd ${scriptdir}
+if [ ! -z "$1" ]; then
+  cd $1
+else
+  cd ${scriptdir}
+fi
 
 if [ ! -d ./googletest/googletest/build ]; then
   if [ ! -d ./googletest ]; then
@@ -24,6 +28,4 @@ if [ -z "$(cat ~/.bashrc | grep GTEST_ROOT)" ]; then
   echo "export GTEST_ROOT=$(pwd)/googletest/googletest" >> ~/.bashrc
   echo "export LD_LIBRARY_PATH=\${GTEST_ROOT}/lib:\${LD_LIBRARY_PATH}" >> ~/.bashrc
   echo "export CMAKE_PREFIX_PATH=\${GTEST_ROOT}:\${CMAKE_PREFIX_PATH}" >> ~/.bashrc
-  source ~/.bashrc
 fi
-

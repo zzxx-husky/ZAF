@@ -2,7 +2,11 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 PHMAP_VERSION=1.30
 
-cd ${scriptdir}
+if [ ! -z "$1" ]; then
+  cd $1
+else
+  cd ${scriptdir}
+fi
 
 if [ ! -d ./parallel-hashmap ]; then
   git clone --depth 1 http://github.com/greg7mdp/parallel-hashmap --branch ${PHMAP_VERSION}

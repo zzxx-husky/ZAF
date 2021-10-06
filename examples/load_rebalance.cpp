@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     auto start = std::chrono::system_clock::now();
     for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
-        engine.spawn<X>(std::chrono::milliseconds{(j + 1) * 25});
+        engine.spawn<X>(std::chrono::milliseconds{(j + 1) * 2});
       }
     }
     engine.await_all_actors_done();
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     auto start = std::chrono::system_clock::now();
     for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
-        engine.spawn<X>(std::chrono::milliseconds{(j + 1) * 25});
+        engine.spawn<X>(std::chrono::milliseconds{(j + 1) * 2});
       }
     }
     engine.await_all_actors_done();
@@ -61,5 +61,5 @@ int main(int argc, char** argv) {
       << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
   }
 
-  LOG(INFO) << "Best duration should be " << (1 + 4) * 4 / 2 * 25 * 100 << "ms";
+  LOG(INFO) << "Best duration should be " << (1 + 4) * 4 / 2 * 2 * 100 << "ms";
 }

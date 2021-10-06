@@ -64,7 +64,7 @@ inline constexpr size_t MaxActorId = []() {
   template<typename ... ArgT>
   using DefaultSortedMultiMap = phmap::btree_multimap<ArgT ...>;
 #else
-  #include <multimap>
+  #include <map>
   template<typename ... ArgT>
   using DefaultSortedMultiMap = std::multimap<ArgT ...>;
 #endif
