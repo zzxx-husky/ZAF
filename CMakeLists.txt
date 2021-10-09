@@ -24,6 +24,8 @@ endif ()
 find_package(ZMQ REQUIRED)
 include_directories(${ZMQ_INCLUDE_DIR})
 set(BasicLibs ${BasicLibs} ${ZMQ_LIBRARY})
+set(ZAFDepsHeaders "${ZAFDepsHeaders};${ZMQ_INCLUDE_DIR}")
+set(ZAFDepsSources "${ZAFDepsSources};${ZMQ_LIBRARY}")
 
 # http://rpg.ifi.uzh.ch/docs/glog.html
 if (DEFINED ENV{GLOG_ROOT})
@@ -32,6 +34,8 @@ endif ()
 find_package(GLOG REQUIRED)
 include_directories(${GLOG_INCLUDE_DIR})
 set(BasicLibs ${BasicLibs} ${GLOG_LIBRARY})
+set(ZAFDepsHeaders "${ZAFDepsHeaders};${GLOG_INCLUDE_DIR}")
+set(ZAFDepsSources "${ZAFDepsSources};${GLOG_LIBRARY}")
 
 #set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fno-omit-frame-pointer")
 
@@ -43,6 +47,7 @@ if (${ENABLE_PHMAP})
   endif ()
   find_package(PHMAP)
   include_directories(${PHMAP_ROOT_DIR})
+  set(ZAFDepsHeaders "${ZAFDepsHeaders};${PHMAP_ROOT_DIR}")
 endif ()
 
 add_subdirectory(core)
@@ -60,6 +65,12 @@ if (${ENABLE_TEST})
 endif ()
 
 add_subdirectory(examples)
+
+file(WRITE ${CMAKE_BINARY_DIR}/zaf_dependencies
+  "${ZAFDepsHeaders}\n"
+  "${ZAFDepsSources}\n"
+  "${ENABLE_PHMAP}\n"
+)
 
 # make install
 include_directories(core)
@@ -85,3 +96,5 @@ install(DIRECTORY core/zaf/
   FILES_MATCHING
   PATTERN "*.hpp"
   PATTERN "*.tpp")
+install(FILES ${CMAKE_BINARY_DIR}/zaf_dependencies
+  DESTINATION ${CMAKE_INSTALL_PREFIX})

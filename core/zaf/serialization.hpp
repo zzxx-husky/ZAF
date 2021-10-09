@@ -1,5 +1,9 @@
 // To be included inside serializer.hpp
 
+#include <optional>
+#include <string>
+#include <type_traits>
+
 namespace zaf {
 // 1. Serialization for POD
 template<typename POD,
@@ -164,5 +168,22 @@ inline void serialize(Serializer& s, const std::string& str) {
 inline void deserialize(Deserializer& s, std::string& str) {
   str.resize(s.read<size_t>());
   s.read_bytes(str.data(), str.size());
+}
+
+// 6. Serialization for std::optional
+template<typename T>
+inline void serialize(Serializer& s, const std::optional<T>& o) {
+  bool has_value = o.has_value();
+  s.write(has_value);
+  if (has_value) {
+    s.write(*o);
+  }
+}
+
+template<typename T>
+inline void deserialize(Deserializer& s, std::optional<T>& o) {
+  if (s.read<bool>()) {
+    o = std::move(s.read<T>());
+  }
 }
 } // namespace zaf

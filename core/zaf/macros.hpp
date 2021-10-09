@@ -25,6 +25,9 @@ inline constexpr size_t MaxActorId = []() {
 
 #ifndef ENABLE_PHMAP
   #define ENABLE_PHMAP 0
+  #if ZAF_PRINT_MACROS
+    #pragma message("Use std unordered map and hash set")
+  #endif
 #elif ENABLE_PHMAP
   #include "parallel_hashmap/phmap.h"
   #include "parallel_hashmap/btree.h"
