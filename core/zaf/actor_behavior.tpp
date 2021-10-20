@@ -25,7 +25,7 @@ void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type,
         this->send(r.net_sender_info->id, DefaultCodes::ForwardMessage, Message::Type::Normal,
           zmq::message_t{&bytes.front(), bytes.size()});
       } else {
-        throw ZAFException("Attempt to serialize non-serializable data");
+        throw ZAFException("Attempt to serialize non-serializable message data.");
       }
     }
   });

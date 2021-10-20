@@ -3,7 +3,6 @@
 #include "zaf/net_gate_client.hpp"
 
 #include "gtest/gtest.h"
-#include "glog/logging.h"
 
 namespace zaf {
 GTEST_TEST(Actor, Send) {

@@ -15,21 +15,10 @@ public:
 
   MessageHandlers& operator=(MessageHandlers&& other);
 
-  inline void process(Message& m) {
-    try {
-      handlers.at(m.get_code())->process(m);
-    } catch (...) {
-      if (handlers.count(m.get_code()) == 0) {
-        std::throw_with_nested(ZAFException(
-          "Handler for code ", m.get_code(), " not found."
-        ));
-      } else {
-        throw;
-      }
-    }
-  }
+  bool try_process(Message& m);
 
-private:
+  void process(Message& m);
+
   template<typename CodeHandler, typename ... ArgT>
   void add_handlers(CodeHandler&& code_handler, ArgT&& ... args) {
     if (!handlers.emplace(std::move(code_handler)).second) {
@@ -38,8 +27,16 @@ private:
     add_handlers(std::forward<ArgT>(args) ...);
   }
 
-  inline void add_handlers() {}
+  size_t size() const;
 
+  void add_handlers();
+
+  void add_child_handlers(MessageHandlers& child);
+
+  MessageHandlers& get_child_handlers();
+
+private:
   DefaultHashMap<size_t, std::unique_ptr<MessageHandler>> handlers;
+  MessageHandlers* child = nullptr;
 };
 } // namespace zaf

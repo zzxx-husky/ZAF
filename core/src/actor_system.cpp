@@ -30,7 +30,7 @@ zmq::context_t& ActorSystem::get_zmq_context() {
 }
 
 ActorIdType ActorSystem::get_next_available_actor_id() {
-  return next_available_actor_id.fetch_add(1, std::memory_order::memory_order_relaxed) % MaxActorId;
+  return next_available_actor_id.fetch_add(1, std::memory_order_relaxed) % MaxActorId;
 }
 
 ActorSystem::~ActorSystem() {
@@ -39,7 +39,7 @@ ActorSystem::~ActorSystem() {
 }
 
 void ActorSystem::set_identifier(const std::string& identifier) {
-  if (num_alive_actors.load(std::memory_order::memory_order_relaxed) == 0) {
+  if (num_alive_actors.load(std::memory_order_relaxed) == 0) {
     throw ZAFException("ActorSystem's identifier cannot be updated if there is any alive actor.");
   }
   this->identifier = identifier;

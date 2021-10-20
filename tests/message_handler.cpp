@@ -18,13 +18,13 @@ GTEST_TEST(MessageHandler, HandlersWithoutArg) {
   };
 
   {
-    auto m = make_message(0);
+    auto m = make_message(nullptr, 0);
     handlers.process(*m);
     EXPECT_EQ(x, 1);
     delete m;
   }
   {
-    auto m = make_message(1);
+    auto m = make_message(nullptr, 1);
     handlers.process(*m);
     EXPECT_EQ(x, 2);
     handlers.process(*m);
@@ -32,7 +32,7 @@ GTEST_TEST(MessageHandler, HandlersWithoutArg) {
     delete m;
   }
   {
-    auto m = make_message(2);
+    auto m = make_message(nullptr, 2);
     EXPECT_ANY_THROW(handlers.process(*m));
     delete m;
   }
@@ -50,13 +50,13 @@ GTEST_TEST(MessageHandler, HandlersWithArgs) {
   };
 
   {
-    auto m = make_message(0, 10);
+    auto m = make_message(nullptr, 0, 10);
     handlers.process(*m);
     EXPECT_EQ(x, 10);
     delete m;
   }
   {
-    auto m = make_message(1, 3);
+    auto m = make_message(nullptr, 1, 3);
     handlers.process(*m);
     EXPECT_EQ(x, 30);
     handlers.process(*m);
@@ -64,7 +64,7 @@ GTEST_TEST(MessageHandler, HandlersWithArgs) {
     delete m;
   }
   {
-    auto m = make_message(2);
+    auto m = make_message(nullptr, 2);
     EXPECT_ANY_THROW(handlers.process(*m));
     delete m;
   }
@@ -85,18 +85,18 @@ GTEST_TEST(MessageHandler, HandlersWithObjArgs) {
     }
   };
   {
-    auto m = make_message(0, std::string("Hello World"));
+    auto m = make_message(nullptr, 0, std::string("Hello World"));
     handlers.process(*m);
     delete m;
   }
   {
-    auto m = make_message(1, std::vector<int>{1,2,3,4,5});
+    auto m = make_message(nullptr, 1, std::vector<int>{1,2,3,4,5});
     handlers.process(*m);
     delete m;
   }
   {
     int b = 10;
-    auto m = make_message(2, &b);
+    auto m = make_message(nullptr, 2, &b);
     handlers.process(*m);
     EXPECT_EQ(b, 20);
     delete m;
@@ -107,7 +107,7 @@ GTEST_TEST(MessageHandler, TypeMismatch) {
   MessageHandlers handlers = {
     zaf::Code{0} - [&](const std::string& x) {}
   };
-  auto m = make_message(0, "123");
+  auto m = make_message(nullptr, 0, "123");
   EXPECT_ANY_THROW(handlers.process(*m));
   delete m;
 }

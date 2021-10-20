@@ -19,7 +19,8 @@ public:
   enum Type : uint8_t {
     Normal = 0,
     Request = 1,
-    Response = 2
+    Response = 2,
+    SWSRQueueMessage = 3,
   };
 
   Message(const Actor& sender_actor, size_t code);
@@ -99,11 +100,6 @@ template<typename ... ArgT>
 auto make_message(Actor sender, size_t code, ArgT&& ... args) {
   auto content = std::make_tuple(std::forward<ArgT>(args)...);
   return new TypedMessage<decltype(content)>(sender, code, std::move(content));
-}
-
-template<typename ... ArgT>
-auto make_message(size_t code, ArgT&& ... args) {
-  return make_message(Actor{}, code, std::forward<ArgT>(args) ...);
 }
 
 struct SerializedMessage : public Message {

@@ -24,6 +24,10 @@ struct Code {
 
 struct DefaultCodes {
   constexpr static size_t ZAFCodeBase = size_t(~0u) << (sizeof(size_t) << 2);
-  constexpr static Code ForwardMessage  {ZAFCodeBase + 1};
+  constexpr static Code ForwardMessage           {ZAFCodeBase + 1};
+  constexpr static Code SWSRMsgQueueRegistration {ZAFCodeBase + 2};
+  constexpr static Code SWSRMsgQueueNotification {ZAFCodeBase + 3};
+  constexpr static Code SWSRMsgQueueTermination  {ZAFCodeBase + 4};
+  constexpr static Code SWSRMsgQueueConsumption  {ZAFCodeBase + 5};
 };
 } // namespace zaf

@@ -107,10 +107,11 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, long timeout) {
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
+  inner_handlers.add_child_handlers(handlers);
   return this->receive_once([&](Message* m) {
     this->current_message = m;
     try {
-      handlers.process(*m);
+      inner_handlers.process(*m);
     } catch (...) {
       std::throw_with_nested(ZAFException(
         "Exception caught when processing a message with code ", m->get_code()
@@ -118,8 +119,8 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
     }
     if (this->current_message) {
       delete this->current_message;
+      this->current_message = nullptr;
     }
-    this->current_message = nullptr;
   }, timeout);
 }
 

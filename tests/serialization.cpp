@@ -114,7 +114,7 @@ GTEST_TEST(SerializedMessage, EmptyMessageContent) {
   };
 
   {
-    auto m = make_message(0);
+    auto m = make_message(nullptr, 0);
     auto s = m->serialize();
     handlers.process(*s);
     EXPECT_EQ(x, 1);
@@ -122,7 +122,7 @@ GTEST_TEST(SerializedMessage, EmptyMessageContent) {
     delete m;
   }
   {
-    auto m = make_message(1);
+    auto m = make_message(nullptr, 1);
     auto s = m->serialize();
     handlers.process(*s);
     EXPECT_EQ(x, 2);
@@ -132,7 +132,7 @@ GTEST_TEST(SerializedMessage, EmptyMessageContent) {
     delete m;
   }
   {
-    auto m = make_message(2);
+    auto m = make_message(nullptr, 2);
     auto s = m->serialize();
     EXPECT_ANY_THROW(handlers.process(*s));
     delete s;
@@ -152,7 +152,7 @@ GTEST_TEST(SerializedMessage, HandlersWithArgs) {
   };
 
   {
-    auto m = make_message(0, 10);
+    auto m = make_message(nullptr, 0, 10);
     auto s = m->serialize();
     handlers.process(*s);
     EXPECT_EQ(x, 10);
@@ -160,7 +160,7 @@ GTEST_TEST(SerializedMessage, HandlersWithArgs) {
     delete m;
   }
   {
-    auto m = make_message(1, 3);
+    auto m = make_message(nullptr, 1, 3);
     auto s = m->serialize();
     handlers.process(*s);
     EXPECT_EQ(x, 30);
@@ -170,7 +170,7 @@ GTEST_TEST(SerializedMessage, HandlersWithArgs) {
     delete m;
   }
   {
-    auto m = make_message(2);
+    auto m = make_message(nullptr, 2);
     auto s = m->serialize();
     EXPECT_ANY_THROW(handlers.process(*s));
     delete s;
@@ -193,14 +193,14 @@ GTEST_TEST(SerializedMessage, HandlersWithObjArgs) {
     }
   };
   {
-    auto m = make_message(0, std::string("Hello World"));
+    auto m = make_message(nullptr, 0, std::string("Hello World"));
     auto s = m->serialize();
     handlers.process(*s);
     delete s;
     delete m;
   }
   {
-    auto m = make_message(1, std::vector<int>{1,2,3,4,5});
+    auto m = make_message(nullptr, 1, std::vector<int>{1,2,3,4,5});
     auto s = m->serialize();
     handlers.process(*s);
     delete s;

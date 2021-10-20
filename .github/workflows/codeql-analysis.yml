@@ -73,7 +73,7 @@ jobs:
         ${{github.workspace}}/scripts/install_gtest.sh ${{github.workspace}}/../
         ${{github.workspace}}/scripts/install_glog.sh ${{github.workspace}}/../
         ${{github.workspace}}/scripts/install_phmap.sh ${{github.workspace}}/../
-        source ~/.bashrc
+        . ~/.bashrc
         cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
         cd ${{github.workspace}}/build
         make all -j4

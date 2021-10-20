@@ -127,6 +127,8 @@ public:
     typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   bool receive_once(Callback&& callback, long timeout = -1);
 
+  // the API is similar with receive_once
+  // the difference is that inner_receive_once does not handle delayed messages
   template<typename Callback,
     typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   bool inner_receive_once(Callback&& callback, long timeout = -1);
@@ -223,6 +225,8 @@ protected:
   zmq::socket_t send_socket, recv_socket;
   ActorGroup* actor_group_ptr = nullptr;
   ActorSystem* actor_system_ptr = nullptr;
+
+  MessageHandlers inner_handlers{}; // default: empty handlers
 };
 
 template<typename ... ArgT>
