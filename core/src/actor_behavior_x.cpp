@@ -58,7 +58,8 @@ void ActorBehaviorX::notify_swsr_queue() {
 void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
   for (unsigned i = 0, n = active_recv_queues.size(); i < n; i++) {
     bool empty = false;
-    active_recv_queues[i]->pop_some([&](Message* m) {
+    auto& recv_queue = active_recv_queues[i];
+    recv_queue->pop_some([&](Message* m) {
       Message* old_current_message = this->current_message;
       this->current_message = m;
       try {
@@ -72,14 +73,17 @@ void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
         delete this->current_message;
       }
       this->current_message = old_current_message;
+      if (!this->is_activated()) {
+        recv_queue->stop_pop_some();
+      }
     }, [&]() {
       empty = true;
     });
     if (empty) {
-      if (active_recv_queues[i]->is_writing_by_sender) {
-        active_recv_queues[i]->is_reading_by_reader = false;
+      if (recv_queue->is_writing_by_sender) {
+        recv_queue->is_reading_by_reader = false;
       } else {
-        delete active_recv_queues[i];
+        delete recv_queue;
       }
       active_recv_queues[i] = active_recv_queues.back();
       active_recv_queues.pop_back();

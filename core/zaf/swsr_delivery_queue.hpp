@@ -45,6 +45,9 @@ private:
   // the buffer with len `cap`
   std::vector<Item> items;
 
+  // used to break pop_some
+  bool flag_stop_pop_some = false;
+
 public:
   // only accessed by the reader
   // when `num_empty_read` equals to `max_empty_read`, reader changes `may_have_message` to false
@@ -225,15 +228,16 @@ public:
   // Return: the number of messages that have been read
   template<typename PopHandler>
   inline unsigned pop_some(PopHandler&& handler, unsigned max_messages_read) {
+    flag_stop_pop_some = false;
     unsigned num_read = 0;
-    while (num_read < max_messages_read) {
+    while (!flag_stop_pop_some && num_read < max_messages_read) {
       auto w = write_index();
       auto r = read_index(std::memory_order_relaxed);
       if (r == w) {
         // empty queue at the moment
         break;
       }
-      for (auto i = r; i < w && num_read < max_messages_read; num_read++, i++) {
+      for (auto i = r; i < w && !flag_stop_pop_some && num_read < max_messages_read; num_read++, i++) {
         // update `read_idx` for each message so that the writer can find available slot when the slot becomes empty
         pop_one(handler);
       }
@@ -250,6 +254,7 @@ public:
   template<typename PopHandler, typename OnReachMaxEmptyRead,
     typename std::enable_if_t<std::is_invocable_v<OnReachMaxEmptyRead>>* = nullptr>
   inline void pop_some(PopHandler&& handler, OnReachMaxEmptyRead&& on_reach_max_empty_read, unsigned max_messages_read) {
+    flag_stop_pop_some = false;
     if (0 == pop_some(handler, max_messages_read)) {
       if (++num_empty_read == max_empty_read) {
         // the reader stops reading this queue until the writer notifies it again
@@ -267,6 +272,10 @@ public:
   template<typename PopHandler, typename OnReachMaxEmptyRead>
   inline void pop_some(PopHandler&& handler, OnReachMaxEmptyRead&& on_reach_max_empty_read) {
     this->pop_some(std::forward<PopHandler>(handler), std::forward<OnReachMaxEmptyRead>(on_reach_max_empty_read), this->max_empty_read);
+  }
+
+  void stop_pop_some() {
+    this->flag_stop_pop_some = true;
   }
 
   friend std::ostream& operator<<(std::ostream& out, const SWSRDeliveryQueue<Item>& item) {
