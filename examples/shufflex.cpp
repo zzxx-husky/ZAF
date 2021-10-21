@@ -11,6 +11,9 @@ int main(int argc, char** argv) {
     senders.emplace_back(system.spawn([=](zaf::ActorBehaviorX& self) {
       self.receive_once({
         zaf::Code{0} - [n_send, n_recv, n_msg, &self](const std::vector<zaf::Actor>& receivers) {
+          for (int j = 0; j < n_recv; j++) {
+            self.setup_swsr_connection(receivers[j]);
+          }
           for (int i = 0; i < n_msg; i++) {
             for (int j = 0; j < n_recv; j++) {
               self.send(receivers[j], 0, 0);

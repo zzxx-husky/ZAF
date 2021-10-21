@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <string>
 #include <variant>
 
 #include "macros.hpp"

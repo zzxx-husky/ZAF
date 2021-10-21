@@ -1,7 +1,12 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "actor.hpp"
-#include "actor_behavior.hpp"
+#include "actor_behavior_x.hpp"
 #include "actor_system.hpp"
 #include "scoped_actor.hpp"
 

@@ -1,4 +1,8 @@
 #pragma once
+
+#include <memory>
+#include <utility>
+
 #include "message_handler.hpp"
 
 namespace zaf {

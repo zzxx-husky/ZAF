@@ -3,6 +3,8 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <utility>
+#include <vector>
 
 #include "actor.hpp"
 #include "actor_behavior.hpp"

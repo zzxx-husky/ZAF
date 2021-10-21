@@ -1,5 +1,8 @@
 #pragma once
 
+#include <utility>
+#include <vector>
+
 #include "actor_behavior.hpp"
 #include "code.hpp"
 #include "swsr_delivery_queue.hpp"
@@ -9,6 +12,8 @@ namespace zaf {
 class ActorBehaviorX : public ActorBehavior {
 public:
   ActorBehaviorX();
+
+  void initialize_actor(ActorSystem&, ActorGroup&) override;
 
   // send a normal message to message sender
   template<typename ... ArgT>
@@ -23,8 +28,13 @@ public:
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
-  inline void send(ActorBehavior& receiver, size_t code, ArgT&& ... args) {
+  inline void send(ActorBehaviorX& receiver, size_t code, ArgT&& ... args) {
     this->send(LocalActorHandle{receiver.get_actor_id()}, code, std::forward<ArgT>(args)...);
+  }
+
+  template<typename ... ArgT>
+  inline void send(ActorBehavior& receiver, size_t code, ArgT&& ... args) {
+    this->ActorBehavior::send(receiver, code, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor, either remote or local
@@ -36,7 +46,6 @@ public:
     receiver.visit(overloaded {
       [&](const LocalActorHandle& r) {
         auto message = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
-        message->set_type(Message::Type::SWSRQueueMessage);
         this->send(r, message);
       },
       [&](const RemoteActorHandle& r) {
@@ -64,7 +73,6 @@ public:
   template<typename ... ArgT>
   inline void send(const LocalActorHandle& receiver, size_t code, ArgT&& ... args) {
     auto m = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
-    m->set_type(Message::Type::SWSRQueueMessage);
     this->send(receiver, m);
   }
 
@@ -76,6 +84,10 @@ public:
 
   void consume_swsr_recv_queues(MessageHandlers& handlers);
 
+  void setup_swsr_connection(const Actor&);
+
+  void setup_swsr_connection(const LocalActorHandle&);
+
   ~ActorBehaviorX();
 
 private:
@@ -86,5 +98,6 @@ private:
   DefaultHashMap<ActorIdType, SWSRDeliveryQueue<Message*>*> swsr_recv_queues;
   // pointers in `active_recv_queues` points to the queues in `swsr_recv_queues`
   std::vector<SWSRDeliveryQueue<Message*>*> active_recv_queues;
+  SWSRDeliveryQueue<Message*> self_swsr_queue;
 };
 } // namespace zaf

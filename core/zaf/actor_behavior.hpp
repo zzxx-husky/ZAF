@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <deque>
+#include <string>
+#include <utility>
 
 #include "actor.hpp"
 #include "message_handlers.hpp"
@@ -221,7 +223,7 @@ protected:
   int waiting_for_response = 0;
   std::deque<Message*> pending_messages;
 
-  ActorIdType actor_id;
+  ActorIdType actor_id{~0u};
   zmq::socket_t send_socket, recv_socket;
   ActorGroup* actor_group_ptr = nullptr;
   ActorSystem* actor_system_ptr = nullptr;

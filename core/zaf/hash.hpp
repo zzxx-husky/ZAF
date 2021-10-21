@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <utility>
 
 namespace zaf {
 inline size_t hash_combine() {

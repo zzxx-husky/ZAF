@@ -24,10 +24,12 @@ GTEST_TEST(ZMQ, Router2Router1x1) {
     for (int i = 0; i < 10; i++) { // receive Hello and reply World
       zmq::message_t client_id;
       EXPECT_TRUE(sock.recv(client_id));
-      EXPECT_EQ(client_identifier, std::string((char*)client_id.data(), client_id.size()));
+      EXPECT_EQ(client_identifier,
+        std::string(reinterpret_cast<char*>(client_id.data()), client_id.size()));
       zmq::message_t msg;
       EXPECT_TRUE(sock.recv(msg));
-      EXPECT_EQ("Hello", std::string((char*)msg.data(), msg.size()));
+      EXPECT_EQ("Hello",
+        std::string(reinterpret_cast<char*>(msg.data()), msg.size()));
 
       sock.send(client_id, zmq::send_flags::sndmore);
       sock.send(zmq::str_buffer("World"));
@@ -52,10 +54,12 @@ GTEST_TEST(ZMQ, Router2Router1x1) {
 
       zmq::message_t server_id;
       EXPECT_TRUE(sock.recv(server_id));
-      EXPECT_EQ(server_identifier, std::string((char*)server_id.data(), server_id.size()));
+      EXPECT_EQ(server_identifier,
+        std::string(reinterpret_cast<char*>(server_id.data()), server_id.size()));
       zmq::message_t msg;
       EXPECT_TRUE(sock.recv(msg));
-      EXPECT_EQ("World", std::string((char*)msg.data(), msg.size()));
+      EXPECT_EQ("World",
+        std::string(reinterpret_cast<char*>(msg.data()), msg.size()));
     }
 
     LOG(INFO) << "C->S->C is good.";
@@ -63,10 +67,12 @@ GTEST_TEST(ZMQ, Router2Router1x1) {
     {
       zmq::message_t server_id;
       EXPECT_TRUE(sock.recv(server_id));
-      EXPECT_EQ(server_identifier, std::string((char*)server_id.data(), server_id.size()));
+      EXPECT_EQ(server_identifier,
+        std::string(reinterpret_cast<char*>(server_id.data()), server_id.size()));
       zmq::message_t msg;
       EXPECT_TRUE(sock.recv(msg));
-      EXPECT_EQ("Hello World", std::string((char*)msg.data(), msg.size()));
+      EXPECT_EQ("Hello World",
+        std::string(reinterpret_cast<char*>(msg.data()), msg.size()));
     }
 
     LOG(INFO) << "S->C is good.";
@@ -145,10 +151,12 @@ GTEST_TEST(ZMQ, Router2RouterTwoServers) {
 
       zmq::message_t sender;
       EXPECT_TRUE(sock.recv(sender));
-      EXPECT_EQ("server2", std::string((char*)sender.data(), sender.size()));
+      EXPECT_EQ("server2",
+        std::string(reinterpret_cast<char*>(sender.data()), sender.size()));
       zmq::message_t msg;
       EXPECT_TRUE(sock.recv(msg));
-      EXPECT_EQ("World", std::string((char*)msg.data(), msg.size()));
+      EXPECT_EQ("World",
+        std::string(reinterpret_cast<char*>(msg.data()), msg.size()));
     }
 
     LOG(INFO) << "Server 1 terminates.";
@@ -164,10 +172,12 @@ GTEST_TEST(ZMQ, Router2RouterTwoServers) {
 
       zmq::message_t sender;
       EXPECT_TRUE(sock.recv(sender));
-      EXPECT_EQ("server1", std::string((char*)sender.data(), sender.size()));
+      EXPECT_EQ("server1",
+        std::string(reinterpret_cast<char*>(sender.data()), sender.size()));
       zmq::message_t msg;
       EXPECT_TRUE(sock.recv(msg));
-      EXPECT_EQ("Hello", std::string((char*)msg.data(), msg.size()));
+      EXPECT_EQ("Hello",
+        std::string(reinterpret_cast<char*>(msg.data()), msg.size()));
     }
 
     LOG(INFO) << "Server 2 terminates.";
@@ -212,13 +222,14 @@ GTEST_TEST(ZMQ, Router2Router4x4) {
       for (int i = 0; i < 3*C; i++) { // receive Hello and reply World
         zmq::message_t client_id;
         EXPECT_TRUE(sock.recv(client_id));
-        EXPECT_EQ(client_identifier, std::string((char*)client_id.data(), client_identifier.size()));
+        EXPECT_EQ(client_identifier,
+          std::string(reinterpret_cast<char*>(client_id.data()), client_identifier.size()));
         zmq::message_t msg;
         EXPECT_TRUE(sock.recv(msg));
-        EXPECT_EQ("Hello", std::string((char*)msg.data(), 5));
+        EXPECT_EQ("Hello", std::string(reinterpret_cast<char*>(msg.data()), 5));
 
         sock.send(client_id, zmq::send_flags::sndmore);
-        auto reply = "World" + std::string((char*)msg.data() + 5, msg.size() - 5);
+        auto reply = "World" + std::string(reinterpret_cast<char*>(msg.data()) + 5, msg.size() - 5);
         sock.send(zmq::buffer(reply));
         // LOG(INFO) << self_id << " sends " << reply << " to " << std::string((char*)client_id.data(), client_id.size());
       }
@@ -304,20 +315,20 @@ GTEST_TEST(ZMQ, Router2Router4x4) {
 
 // GTEST_TEST(ZMQ, SelfLoop) {
 //   zmq::context_t ctx;
-// 
+//
 //   zmq::socket_t server(ctx, zmq::socket_type::router);
 //   server.set(zmq::sockopt::routing_id, zmq::str_buffer("server"));
 //   server.bind("inproc://server");
-// 
+//
 //   // server.connect("inproc://server");
-// 
+//
 //   std::thread server_thread([&]() {
 //     auto& sock = server;
-// 
+//
 //     for (int i = 0; i < 10; i++) { // receive Hello and reply World
 //       sock.send(zmq::str_buffer("server"), zmq::send_flags::sndmore);
 //       sock.send(zmq::str_buffer("Hello World"));
-// 
+//
 //       zmq::message_t sender;
 //       EXPECT_TRUE(sock.recv(sender));
 //       EXPECT_EQ("server", std::string((char*)sender.data(), sender.size()));
@@ -325,11 +336,11 @@ GTEST_TEST(ZMQ, Router2Router4x4) {
 //       EXPECT_TRUE(sock.recv(msg));
 //       EXPECT_EQ("Hello World", std::string((char*)msg.data(), msg.size()));
 //     }
-// 
+//
 //     LOG(INFO) << "Server terminates.";
 //     sock.close();
 //   });
-// 
+//
 //   server_thread.join();
 // }
 } // namespace zaf

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 #include <thread>
 #include <type_traits>
+#include <utility>
 
 #include "actor.hpp"
 #include "actor_behavior.hpp"

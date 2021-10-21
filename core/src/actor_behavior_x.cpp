@@ -5,6 +5,7 @@ ActorBehaviorX::ActorBehaviorX() {
   ActorBehavior::inner_handlers.add_handlers(
     DefaultCodes::SWSRMsgQueueRegistration - [&](SWSRDeliveryQueue<Message*>* queue) {
       this->register_swsr_queue(queue);
+      this->setup_swsr_connection(this->get_current_sender_actor());
     },
     DefaultCodes::SWSRMsgQueueNotification - [&]() {
       this->notify_swsr_queue();
@@ -26,20 +27,28 @@ ActorBehaviorX::ActorBehaviorX() {
     });
 }
 
-void ActorBehaviorX::send(const LocalActorHandle& actor, Message* m) {
-  auto& swsr_queue = this->swsr_send_queues[actor.local_actor_id];
-  if (swsr_queue == nullptr) {
-    swsr_queue = new SWSRDeliveryQueue<Message*>();
-    // initialization for a new swsr queue
-    swsr_queue->resize(15);
-    // send the queue from sender to receiver
-    this->ActorBehavior::send(actor, DefaultCodes::SWSRMsgQueueRegistration, swsr_queue);
+void ActorBehaviorX::initialize_actor(ActorSystem& sys, ActorGroup& group) {
+  this->ActorBehavior::initialize_actor(sys, group);
+  { // a queue for sending messages to self
+    this->self_swsr_queue.resize(15);
+    this->swsr_send_queues.emplace(this->get_actor_id(), &this->self_swsr_queue);
+    this->swsr_recv_queues.emplace(this->get_actor_id(), &this->self_swsr_queue);
   }
-  swsr_queue->push(m, [&]() {
-    this->ActorBehavior::send(actor, DefaultCodes::SWSRMsgQueueNotification);
-  }, actor.local_actor_id == this->get_actor_id()
-       ? SWSRDeliveryQueueFullStrategy::Resize
-       : SWSRDeliveryQueueFullStrategy::Blocking);
+}
+
+void ActorBehaviorX::send(const LocalActorHandle& actor, Message* m) {
+  auto iter = this->swsr_send_queues.find(actor.local_actor_id);
+  if (iter == this->swsr_send_queues.end()) {
+    m->set_type(Message::Type::Normal);
+    this->ActorBehavior::send(actor, m);
+  } else {
+    m->set_type(Message::Type::SWSRQueueMessage);
+    iter->second->push(m, [&]() {
+      this->ActorBehavior::send(actor, DefaultCodes::SWSRMsgQueueNotification);
+    }, actor.local_actor_id == this->get_actor_id()
+         ? SWSRDeliveryQueueFullStrategy::Resize
+         : SWSRDeliveryQueueFullStrategy::Blocking);
+  }
 }
 
 void ActorBehaviorX::register_swsr_queue(SWSRDeliveryQueue<Message*>* recv_queue) {
@@ -98,5 +107,28 @@ ActorBehaviorX::~ActorBehaviorX() {
     this->ActorBehavior::send(LocalActorHandle{id2queue.first}, DefaultCodes::SWSRMsgQueueTermination);
   }
   swsr_send_queues.clear();
+}
+
+void ActorBehaviorX::setup_swsr_connection(const Actor& x) {
+  x.visit(overloaded {
+    [&](const LocalActorHandle& r) {
+      this->setup_swsr_connection(r);
+    },
+    [&](const RemoteActorHandle& r) {
+      this->setup_swsr_connection(LocalActorHandle{r.net_sender_info->id});
+    }
+  });
+}
+
+void ActorBehaviorX::setup_swsr_connection(const LocalActorHandle& actor) {
+  auto& swsr_queue = this->swsr_send_queues[actor.local_actor_id];
+  if (swsr_queue != nullptr) {
+    return;
+  }
+  swsr_queue = new SWSRDeliveryQueue<Message*>();
+  // initialization for a new swsr queue
+  swsr_queue->resize(15);
+  // send the queue from sender to receiver
+  this->ActorBehavior::send(actor, DefaultCodes::SWSRMsgQueueRegistration, swsr_queue);
 }
 } // namespace zaf

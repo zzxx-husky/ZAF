@@ -67,8 +67,7 @@ void ActorBehavior::send(const LocalActorHandle& receiver, Message* m) {
       "Failed to send a multi-part zmq message for receiver routing id:\n",
       "  from sender: ", this->actor_id, '\n',
       "  to receiver: ", receiver_id, '\n',
-      "  receiver routing id: ", recv_routing_id
-    ));
+      "  receiver routing id: ", recv_routing_id));
   }
   try {
     send_socket.send(zmq::const_buffer(&m, sizeof(m)));
@@ -76,12 +75,10 @@ void ActorBehavior::send(const LocalActorHandle& receiver, Message* m) {
     if (!bool(send_socket)) {
       std::throw_with_nested(ZAFException(
         "Exception caught when sending a message in actor ", this->actor_id, '\n',
-        "  Attempt to send message before sockets are setup."
-      ));
+        "  Attempt to send message before sockets are setup."));
     } else {
       std::throw_with_nested(ZAFException(
-        "Exception caught when sending a message in actor ", this->actor_id
-      ));
+        "Exception caught when sending a message in actor ", this->actor_id));
     }
   }
 }
@@ -94,11 +91,13 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, bool non_blocking) {
   return this->receive_once(handlers, long(non_blocking ? 0 : -1));
 }
 
-bool ActorBehavior::receive_once(MessageHandlers&& handlers, const std::chrono::milliseconds& timeout) {
+bool ActorBehavior::receive_once(MessageHandlers&& handlers,
+  const std::chrono::milliseconds& timeout) {
   return this->receive_once(handlers, timeout);
 }
 
-bool ActorBehavior::receive_once(MessageHandlers& handlers, const std::chrono::milliseconds& timeout) {
+bool ActorBehavior::receive_once(MessageHandlers& handlers,
+  const std::chrono::milliseconds& timeout) {
   return this->receive_once(handlers, static_cast<long>(timeout.count()));
 }
 
@@ -114,8 +113,7 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
       inner_handlers.process(*m);
     } catch (...) {
       std::throw_with_nested(ZAFException(
-        "Exception caught when processing a message with code ", m->get_code()
-      ));
+        "Exception caught when processing a message with code ", m->get_code()));
     }
     if (this->current_message) {
       delete this->current_message;
@@ -137,7 +135,8 @@ void ActorBehavior::receive(MessageHandlers& handlers) {
 
 void ActorBehavior::initialize_recv_socket() {
   auto recv_routing_id = get_routing_id(this->actor_id, false);
-  recv_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
+  recv_socket = zmq::socket_t(
+    this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
   // must set routing_id before bind
   recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(recv_routing_id));
   recv_socket.bind("inproc://" + recv_routing_id);
@@ -151,7 +150,8 @@ void ActorBehavior::terminate_recv_socket() {
 
 void ActorBehavior::initialize_send_socket() {
   auto send_routing_id = get_routing_id(this->actor_id, true);
-  send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
+  send_socket = zmq::socket_t(
+    this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
   // must set routing_id before connect
   send_socket.set(zmq::sockopt::routing_id, zmq::buffer(send_routing_id));
   send_socket.set(zmq::sockopt::sndhwm, 0);
@@ -188,7 +188,8 @@ void ActorBehavior::initialize_actor(ActorSystem& sys, ActorGroup& group) {
 
 void ActorBehavior::initialize_routing_id_buffer() {
   routing_id_buffer.clear();
-  routing_id_buffer.reserve(ActorIdMaxLen + this->get_actor_system().get_identifier().size() + 1);
+  routing_id_buffer.reserve(ActorIdMaxLen +
+    this->get_actor_system().get_identifier().size() + 1);
   routing_id_buffer.append(ActorIdMaxLen, '0');
   routing_id_buffer.append(this->get_actor_system().get_identifier());
   routing_id_buffer.push_back(' ');
@@ -235,8 +236,8 @@ void ActorBehavior::connect(ActorIdType peer_id) {
     send_socket.connect(routing_id);
   } catch (...) {
     std::throw_with_nested(ZAFException(
-      "Actor", this->get_actor_id(), " failed to connect to receiver actor ", peer_id, " via ", routing_id
-    ));
+      "Actor", this->get_actor_id(), " failed to connect to receiver actor ",
+      peer_id, " via ", routing_id));
   }
 }
 
@@ -246,8 +247,8 @@ void ActorBehavior::disconnect(ActorIdType peer_id) {
     send_socket.disconnect(routing_id);
   } catch (...) {
     std::throw_with_nested(ZAFException(
-      this->get_actor_id(), " failed to disconnect to receiver ", peer_id, " via ", routing_id
-    ));
+      this->get_actor_id(), " failed to disconnect to receiver ",
+      peer_id, " via ", routing_id));
   }
 }
 
@@ -296,10 +297,13 @@ void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
   --self.waiting_for_response;
 }
 
-std::optional<std::chrono::milliseconds> ActorBehavior::remaining_time_to_next_delayed_message() const {
+std::optional<std::chrono::milliseconds>
+ActorBehavior::remaining_time_to_next_delayed_message() const {
   return delayed_messages.empty()
     ? std::nullopt
-    : std::optional(std::chrono::duration_cast<std::chrono::milliseconds>(delayed_messages.begin()->first - std::chrono::steady_clock::now()));
+    : std::optional(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+          delayed_messages.begin()->first - std::chrono::steady_clock::now()));
 }
 
 void ActorBehavior::flush_delayed_messages() {
@@ -313,7 +317,8 @@ void ActorBehavior::flush_delayed_messages() {
       },
       [&](zmq::message_t& m) {
         RemoteActorHandle& r = msg.receiver;
-        this->send(LocalActorHandle{r.net_sender_info->id}, DefaultCodes::ForwardMessage, std::move(m));
+        this->send(LocalActorHandle{r.net_sender_info->id},
+          DefaultCodes::ForwardMessage, std::move(m));
       }
     }, msg.message);
     delayed_messages.erase(delayed_messages.begin());

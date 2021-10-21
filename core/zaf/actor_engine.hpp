@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <stdexcept>
+#include <vector>
 
 #include "actor.hpp"
 #include "actor_behavior.hpp"

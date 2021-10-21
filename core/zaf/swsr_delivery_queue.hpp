@@ -222,25 +222,17 @@ public:
   }
 
   // Read some messages that are immediately available in the queue.
-  // The read loops until the number of messages that are read reaches the maximum,
-  // or there is no available message in the queue.
   // The number of messages to be read will be no more than `max_messages_read`.
   // Return: the number of messages that have been read
   template<typename PopHandler>
   inline unsigned pop_some(PopHandler&& handler, unsigned max_messages_read) {
+    auto w = write_index();
+    auto r = read_index(std::memory_order_relaxed);
     flag_stop_pop_some = false;
     unsigned num_read = 0;
-    while (!flag_stop_pop_some && num_read < max_messages_read) {
-      auto w = write_index();
-      auto r = read_index(std::memory_order_relaxed);
-      if (r == w) {
-        // empty queue at the moment
-        break;
-      }
-      for (auto i = r; i < w && !flag_stop_pop_some && num_read < max_messages_read; num_read++, i++) {
-        // update `read_idx` for each message so that the writer can find available slot when the slot becomes empty
-        pop_one(handler);
-      }
+    for (; r != w && !flag_stop_pop_some && num_read < max_messages_read; num_read++, r++) {
+      // update `read_idx` for each message so that the writer can find available slot when the slot becomes empty
+      pop_one(handler);
     }
     return num_read;
   }
@@ -254,7 +246,6 @@ public:
   template<typename PopHandler, typename OnReachMaxEmptyRead,
     typename std::enable_if_t<std::is_invocable_v<OnReachMaxEmptyRead>>* = nullptr>
   inline void pop_some(PopHandler&& handler, OnReachMaxEmptyRead&& on_reach_max_empty_read, unsigned max_messages_read) {
-    flag_stop_pop_some = false;
     if (0 == pop_some(handler, max_messages_read)) {
       if (++num_empty_read == max_empty_read) {
         // the reader stops reading this queue until the writer notifies it again

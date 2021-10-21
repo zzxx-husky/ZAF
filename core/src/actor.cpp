@@ -18,7 +18,8 @@ size_t LocalActorHandle::hash_code() const {
   return local_actor_id;
 }
 
-RemoteActorHandle::RemoteActorHandle(const NetSenderInfo& net_sender_info, ActorIdType remote_actor_id):
+RemoteActorHandle::RemoteActorHandle(const NetSenderInfo& net_sender_info,
+  ActorIdType remote_actor_id):
   net_sender_info(&net_sender_info),
   remote_actor_id(remote_actor_id) {
 }
@@ -28,7 +29,8 @@ RemoteActorHandle::operator bool() const {
 }
 
 bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b) {
-  return a.net_sender_info == b.net_sender_info && a.remote_actor_id == b.remote_actor_id;
+  return a.net_sender_info == b.net_sender_info &&
+    a.remote_actor_id == b.remote_actor_id;
 }
 
 size_t RemoteActorHandle::hash_code() const {
@@ -55,7 +57,7 @@ ActorIdType Actor::get_actor_id() const {
 }
 
 Actor::operator bool() const {
-  return std::visit([](auto&& x) { return bool(x); }, handle);
+  return std::visit([](auto&& x) { return static_cast<bool>(x); }, handle);
 }
 
 bool operator==(const Actor& a, const Actor& b) {
@@ -74,13 +76,21 @@ bool Actor::is_remote() const {
   return !is_local();
 }
 
-Actor::operator LocalActorHandle&() { return std::get<LocalActorHandle>(handle); }
+Actor::operator LocalActorHandle&() {
+  return std::get<LocalActorHandle>(handle);
+}
 
-Actor::operator const LocalActorHandle&() const { return std::get<LocalActorHandle>(handle); }
+Actor::operator const LocalActorHandle&() const {
+  return std::get<LocalActorHandle>(handle);
+}
 
-Actor::operator RemoteActorHandle&() { return std::get<RemoteActorHandle>(handle); }
+Actor::operator RemoteActorHandle&() {
+  return std::get<RemoteActorHandle>(handle);
+}
 
-Actor::operator const RemoteActorHandle&() const { return std::get<RemoteActorHandle>(handle); }
+Actor::operator const RemoteActorHandle&() const {
+  return std::get<RemoteActorHandle>(handle);
+}
 
 ActorInfo Actor::to_actor_info(const Actor& requester) const {
   return this->visit(overloaded{
