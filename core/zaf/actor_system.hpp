@@ -40,8 +40,6 @@ public:
   Actor spawn(Callable&& callable) {
     auto new_actor = new ActorType();
     new_actor->initialize_actor(*this, *this);
-    // only after initialize_actor we get the actor id.
-    auto new_actor_id = new_actor->get_actor_id();
     std::thread([run = std::forward<Callable>(callable), new_actor]() mutable {
       try {
         run(*new_actor);
@@ -53,7 +51,7 @@ public:
       }
       delete new_actor;
     }).detach();
-    return {new_actor_id};
+    return {new_actor->get_local_actor_handle()};
   }
 
   zmq::context_t& get_zmq_context();

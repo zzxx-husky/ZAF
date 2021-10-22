@@ -6,10 +6,9 @@
 namespace zaf {
 Actor ActorEngine::spawn(ActorBehavior* new_actor) {
   new_actor->initialize_actor(forwarder->get_actor_system(), *this);
-  auto new_actor_id = new_actor->get_actor_id();
   this->inc_num_alive_actors();
   forwarder->send(executors[next_executor++ % num_executors], Executor::NewActor, new_actor);
-  return {new_actor_id};
+  return {new_actor->get_local_actor_handle()};
 }
 
 void ActorEngine::init_scoped_actor(ActorBehavior& new_actor) {

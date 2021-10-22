@@ -20,7 +20,6 @@ public:
     Normal = 0,
     Request = 1,
     Response = 2,
-    SWSRQueueMessage = 3,
   };
 
   Message(const Actor& sender_actor, size_t code);

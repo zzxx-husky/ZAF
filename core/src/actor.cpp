@@ -2,8 +2,9 @@
 #include "zaf/hash.hpp"
 
 namespace zaf {
-LocalActorHandle::LocalActorHandle(ActorIdType id):
-  local_actor_id(id) {
+LocalActorHandle::LocalActorHandle(ActorIdType id, bool use_swsr):
+  local_actor_id(id),
+  use_swsr_msg_delivery(use_swsr) {
 }
 
 LocalActorHandle::operator bool() const {
@@ -19,9 +20,9 @@ size_t LocalActorHandle::hash_code() const {
 }
 
 RemoteActorHandle::RemoteActorHandle(const NetSenderInfo& net_sender_info,
-  ActorIdType remote_actor_id):
+  const LocalActorHandle& remote_actor):
   net_sender_info(&net_sender_info),
-  remote_actor_id(remote_actor_id) {
+  remote_actor(remote_actor) {
 }
 
 RemoteActorHandle::operator bool() const {
@@ -30,11 +31,11 @@ RemoteActorHandle::operator bool() const {
 
 bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b) {
   return a.net_sender_info == b.net_sender_info &&
-    a.remote_actor_id == b.remote_actor_id;
+    a.remote_actor == b.remote_actor;
 }
 
 size_t RemoteActorHandle::hash_code() const {
-  return hash_combine(net_sender_info->id, remote_actor_id);
+  return hash_combine(net_sender_info->net_sender.local_actor_id, remote_actor.hash_code());
 }
 
 Actor::Actor(const LocalActorHandle& x): handle(x) {}
@@ -52,7 +53,7 @@ ActorIdType Actor::get_actor_id() const {
   if (handle.index() == 0) {
     return std::get<0>(handle).local_actor_id;
   } else {
-    return std::get<1>(handle).net_sender_info->id;
+    return std::get<1>(handle).net_sender_info->net_sender.local_actor_id;
   }
 }
 
@@ -105,11 +106,11 @@ ActorInfo Actor::to_actor_info(const Actor& requester) const {
           return r.net_sender_info->local_net_gate_url;
         }
       });
-      return ActorInfo{l.local_actor_id, url};
+      return ActorInfo{l, url};
     },
     [&](const RemoteActorHandle& r) {
       // a remote actor requests the actor info of a remote actor
-      return ActorInfo{r.remote_actor_id, r.net_sender_info->remote_net_gate_url};
+      return ActorInfo{r.remote_actor, r.net_sender_info->remote_net_gate_url};
     }
   });
 }

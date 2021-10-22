@@ -15,53 +15,61 @@ public:
 
   void initialize_actor(ActorSystem&, ActorGroup&) override;
 
+  LocalActorHandle get_local_actor_handle() const override;
+
   // send a normal message to message sender
   template<typename ... ArgT>
   inline void reply(size_t code, ArgT&& ... args) {
-    if (this->get_current_message().get_type() == Message::Type::SWSRQueueMessage) {
-      this->send(this->get_current_sender_actor(),
-        code, std::forward<ArgT>(args)...);
-    } else {
+    if (this->get_current_message().get_type() == Message::Type::Request) {
       this->ActorBehavior::reply(code, std::forward<ArgT>(args) ...);
+    } else {
+      this->send(this->get_current_sender_actor(),
+        code, Message::Type::Normal, std::forward<ArgT>(args)...);
     }
   }
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
-  inline void send(ActorBehaviorX& receiver, size_t code, ArgT&& ... args) {
-    this->send(LocalActorHandle{receiver.get_actor_id()}, code, std::forward<ArgT>(args)...);
+  inline void send(const ActorBehavior& receiver, size_t code, ArgT&& ... args) {
+    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  inline void send(ActorBehavior& receiver, size_t code, ArgT&& ... args) {
-    this->ActorBehavior::send(receiver, code, std::forward<ArgT>(args)...);
+  inline void send(const ActorBehavior& receiver, size_t code, Message::Type type, ArgT&& ... args) {
+    this->send(receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor, either remote or local
   template<typename ... ArgT>
-  void send(const Actor& receiver, size_t code, ArgT&& ... args) {
+  inline void send(const Actor& receiver, size_t code, ArgT&& ... args) {
+    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  }
+
+  template<typename ... ArgT>
+  void send(const Actor& receiver, size_t code, Message::Type type, ArgT&& ... args) {
     if (!receiver) {
       return;
     }
     receiver.visit(overloaded {
       [&](const LocalActorHandle& r) {
-        auto message = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+        auto message = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
+        message->set_type(type);
         this->send(r, message);
       },
       [&](const RemoteActorHandle& r) {
         if constexpr (traits::all_serializable<ArgT ...>::value) {
           std::vector<char> bytes;
           Serializer(bytes)
-            .write(this->get_actor_id())
-            .write(r.remote_actor_id)
+            .write(this->get_local_actor_handle())
+            .write(r.remote_actor)
             .write(code)
-            .write(Message::Type::SWSRQueueMessage)
+            .write(type)
             .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
             .write(std::forward<ArgT>(args) ...);
           // Have to copy the bytes here because we do not know how many bytes
           // are needed for serialization and we need to reserve more than necessary.
-          this->send(LocalActorHandle{r.net_sender_info->id}, DefaultCodes::ForwardMessage, Message::Type::SWSRQueueMessage,
-            zmq::message_t{&bytes.front(), bytes.size()});
+          this->send(r.net_sender_info->net_sender,
+            DefaultCodes::ForwardMessage, zmq::message_t{&bytes.front(), bytes.size()});
         } else {
           throw ZAFException("Attempt to serialize non-serializable message data.");
         }
@@ -72,7 +80,13 @@ public:
   // send a message to LocalActorHandle
   template<typename ... ArgT>
   inline void send(const LocalActorHandle& receiver, size_t code, ArgT&& ... args) {
-    auto m = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  }
+
+  template<typename ... ArgT>
+  inline void send(const LocalActorHandle& receiver, size_t code, Message::Type type, ArgT&& ... args) {
+    auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
+    m->set_type(type);
     this->send(receiver, m);
   }
 

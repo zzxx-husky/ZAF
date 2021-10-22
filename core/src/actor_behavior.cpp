@@ -28,7 +28,7 @@ ActorGroup& ActorBehavior::get_actor_group() {
 }
 
 Actor ActorBehavior::get_self_actor() {
-  return {this->actor_id};
+  return {get_local_actor_handle()};
 }
 
 Message& ActorBehavior::get_current_message() const {
@@ -113,7 +113,8 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
       inner_handlers.process(*m);
     } catch (...) {
       std::throw_with_nested(ZAFException(
-        "Exception caught when processing a message with code ", m->get_code()));
+        "Exception caught when processing a message with code ", m->get_code(),
+        '(', std::hex, m->get_code(), ')'));
     }
     if (this->current_message) {
       delete this->current_message;
@@ -155,6 +156,7 @@ void ActorBehavior::initialize_send_socket() {
   // must set routing_id before connect
   send_socket.set(zmq::sockopt::routing_id, zmq::buffer(send_routing_id));
   send_socket.set(zmq::sockopt::sndhwm, 0);
+  send_socket.set(zmq::sockopt::linger, 0);
   // connect to self
   connected_receivers.insert(this->get_actor_id());
   connect(this->actor_id);
@@ -230,6 +232,10 @@ ActorIdType ActorBehavior::get_actor_id() const {
   return actor_id;
 }
 
+LocalActorHandle ActorBehavior::get_local_actor_handle() const {
+  return {actor_id, false};
+}
+
 void ActorBehavior::connect(ActorIdType peer_id) {
   auto routing_id = "inproc://" + get_routing_id(peer_id, false);
   try {
@@ -281,8 +287,8 @@ void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
         handlers.process(*m);
       } catch (...) {
         std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", m->get_code()
-        ));
+          "Exception caught when processing a message with code ", m->get_code(),
+          '(', std::hex, m->get_code(), ')'));
       }
       if (self.current_message) {
         delete self.current_message;
@@ -317,7 +323,7 @@ void ActorBehavior::flush_delayed_messages() {
       },
       [&](zmq::message_t& m) {
         RemoteActorHandle& r = msg.receiver;
-        this->send(LocalActorHandle{r.net_sender_info->id},
+        this->send(r.net_sender_info->net_sender,
           DefaultCodes::ForwardMessage, std::move(m));
       }
     }, msg.message);

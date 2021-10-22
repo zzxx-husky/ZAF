@@ -30,18 +30,18 @@ void NetGate::Receiver::receive_once_from_net() {
     );
   }
   Deserializer s((const char*) bytes.data());
-  auto send_actor_id = deserialize<ActorIdType>(s);
-  auto recv_actor_id = deserialize<ActorIdType>(s);
+  auto send_actor = deserialize<LocalActorHandle>(s);
+  auto recv_actor = deserialize<LocalActorHandle>(s);
   auto message_code = deserialize<size_t>(s);
   auto message_type = deserialize<Message::Type>(s);
   auto types_hash = deserialize<size_t>(s);
-  this->send(recv_actor_id, new TypedSerializedMessage<zmq::message_t>(
-    Actor{RemoteActorHandle{net_sender_info, send_actor_id}},
+  this->send(recv_actor, new TypedSerializedMessage<zmq::message_t>(
+    Actor{RemoteActorHandle{net_sender_info, send_actor}},
     message_code,
     message_type,
     types_hash,
     std::move(bytes),
-    sizeof(ActorIdType) + sizeof(ActorIdType) + sizeof(size_t) + sizeof(Message::Type) + sizeof(size_t)
+    LocalActorHandle::SerializationSize + LocalActorHandle::SerializationSize + sizeof(size_t) + sizeof(Message::Type) + sizeof(size_t)
   ));
 }
 
@@ -71,14 +71,14 @@ void NetGate::Receiver::launch() {
 }
 
 void NetGate::Receiver::initialize_recv_socket() {
-  this->ActorBehavior::initialize_recv_socket();
+  this->ActorBehaviorX::initialize_recv_socket();
   net_recv_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::pull);
   // Bind to any available port
   net_recv_socket.bind(to_string("tcp://", bind_host, ":*"));
 }
 
 void NetGate::Receiver::terminate_recv_socket() {
-  this->ActorBehavior::terminate_recv_socket();
+  this->ActorBehaviorX::terminate_recv_socket();
   // same url as the one when binding
   net_recv_socket.unbind(to_string("tcp://", bind_host, ":*"));
   net_recv_socket.close();
@@ -89,14 +89,14 @@ MessageHandlers NetGate::Sender::behavior() {
     NetGate::DataConnReq - [&](const std::string& host, int port) {
       this->connected_url = to_string("tcp://", host, ':', port);
       try {
-        send_socket.connect(connected_url);
+        net_send_socket.connect(connected_url);
       } catch (...) {
         std::throw_with_nested(ZAFException(
           "Actor ", this->get_actor_id(), " unable to connect `", connected_url, "`."
         ));
       }
       for (auto& m : pending_messages) {
-        send_socket.send(m, zmq::send_flags::none);
+        net_send_socket.send(m, zmq::send_flags::none);
       }
       pending_messages.clear();
     },
@@ -104,32 +104,29 @@ MessageHandlers NetGate::Sender::behavior() {
       this->get_actor_system().dec_num_detached_actors();
       this->deactivate();
     },
-    // `msg_bytes` should include
-    // 0. (ActorIdType) the actor id of the local sender actor
-    // 1. (ActorIdType) the actor id of the remote receiver actor
-    // 2. (size_t) the message code
-    // 3. (size_t) the hash code of the message content types
-    // 4. the bytes of the message content
     DefaultCodes::ForwardMessage - [&](zmq::message_t& msg_bytes) {
       if (this->connected_url.empty()) {
         pending_messages.emplace_back(std::move(msg_bytes));
       } else {
-        send_socket.send(msg_bytes, zmq::send_flags::none);
+        net_send_socket.send(msg_bytes, zmq::send_flags::none);
       }
     }
   };
 }
 
 void NetGate::Sender::initialize_send_socket() {
-  send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::push);
-  send_socket.set(zmq::sockopt::sndhwm, 0);
+  this->ActorBehaviorX::initialize_send_socket();
+  net_send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::push);
+  net_send_socket.set(zmq::sockopt::sndhwm, 0);
+  net_send_socket.set(zmq::sockopt::linger, 0);
 }
 
 void NetGate::Sender::terminate_send_socket() {
   if (!connected_url.empty()) {
-    send_socket.disconnect(connected_url);
+    net_send_socket.disconnect(connected_url);
   }
-  send_socket.close();
+  net_send_socket.close();
+  this->ActorBehaviorX::terminate_send_socket();
 }
 
 NetGate::NetGateActor::NetGateActor(const std::string& host, int port):
@@ -160,15 +157,23 @@ MessageHandlers NetGate::NetGateActor::behavior() {
     NetGate::BindPortRep - [&](const std::string& url, int port) {
       this->send_to_net_gate(url, NetGate::DataConnReq, this->bind_host, port);
     },
-    NetGate::ActorRegistration - [&](const std::string& name, Actor actor) {
-      auto& local_actor = local_registered_actors[name];
-      local_actor.actor = actor;
-      if (!local_actor.requesters.empty()) {
-        for (auto& i : local_actor.requesters) {
-          this->send_to_net_gate(i, NetGate::RemoteActorLookupRep, name, actor.get_actor_id());
+    NetGate::ActorRegistration - [&](const std::string& name, const Actor& actor) {
+      actor.visit(overloaded {
+        [&](const LocalActorHandle& l) {
+          auto& local_actor = local_registered_actors[name];
+          local_actor.actor = l;
+          if (!local_actor.requesters.empty()) {
+            for (auto& i : local_actor.requesters) {
+              this->send_to_net_gate(i, NetGate::RemoteActorLookupRep, name, l);
+            }
+            local_actor.requesters.clear();
+          }
+        },
+        [&](const RemoteActorHandle& r) {
+          throw ZAFException("Failed to register actor with name ", name, " because it is not a local actor.");
         }
-        local_actor.requesters.clear();
-      }
+      });
+      
     },
     // `url` in the format of "a.b.c.d:port"
     NetGate::ActorLookupReq - [&](const std::string& url, const std::string& name) {
@@ -185,17 +190,17 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       auto& local_actor = local_registered_actors[name];
       if (local_actor.actor) {
         this->send_to_net_gate(peer,
-          NetGate::RemoteActorLookupRep, name, local_actor.actor->get_actor_id());
+          NetGate::RemoteActorLookupRep, name, *local_actor.actor);
       } else {
         local_actor.requesters.push_back(std::move(peer));
       }
     },
-    NetGate::RemoteActorLookupRep - [&](const std::string& name, ActorIdType remote_actor_id) {
+    NetGate::RemoteActorLookupRep - [&](const std::string& name, const LocalActorHandle& remote_actor) {
       std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
       auto& conn = net_gate_connections.at(peer);
       auto& requesters = conn.actor_lookup_requesters;
       auto iter = requesters.find(name);
-      Actor actor{RemoteActorHandle{conn.net_sender_info, remote_actor_id}};
+      Actor actor{RemoteActorHandle{conn.net_sender_info, remote_actor}};
       for (auto& i : iter->second) {
         this->send(i, ActorLookupRep, peer, name, actor);
       }
@@ -224,13 +229,13 @@ MessageHandlers NetGate::NetGateActor::behavior() {
     NetGate::RetrieveActorReq - [&](ActorInfo& info) {
       if (info.net_gate_url.empty()) {
         this->reply(NetGate::RetrieveActorRep,
-          std::move(info), Actor{LocalActorHandle{info.actor_id}});
+          std::move(info), Actor{info.actor});
       } else {
         this->establish_connection(info.net_gate_url);
         this->reply(NetGate::RetrieveActorRep,
           std::move(info), Actor{RemoteActorHandle{
             this->net_gate_connections.at(info.net_gate_url).net_sender_info,
-            info.actor_id
+            info.actor
           }});
       }
     }
@@ -297,7 +302,7 @@ bool NetGate::NetGateActor::establish_connection(const std::string& url) {
   conn.sender = actor_sys.spawn<Sender>();
   actor_sys.inc_num_detached_actors();
   conn.net_sender_info = NetSenderInfo {
-    conn.sender.get_actor_id(),
+    conn.sender,
     to_string(bind_host, ':', bind_port),
     url
   };
@@ -347,15 +352,16 @@ void NetGate::NetGateActor::launch() {
 }
 
 void NetGate::NetGateActor::initialize_send_socket() {
-  this->ActorBehavior::initialize_send_socket();
+  this->ActorBehaviorX::initialize_send_socket();
   net_send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
   auto routing_id = to_string(bind_host, ':', bind_port, "/s");
   net_send_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
   net_send_socket.set(zmq::sockopt::sndhwm, 0);
+  net_send_socket.set(zmq::sockopt::linger, 0);
 }
 
 void NetGate::NetGateActor::initialize_recv_socket() {
-  this->ActorBehavior::initialize_recv_socket();
+  this->ActorBehaviorX::initialize_recv_socket();
   net_recv_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
   auto routing_id = to_string(bind_host, ':', bind_port, "/r");
   net_recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
@@ -368,14 +374,14 @@ void NetGate::NetGateActor::terminate_send_socket() {
     net_send_socket.disconnect(i.first);
   }
   net_send_socket.close();
-  this->ActorBehavior::terminate_send_socket();
+  this->ActorBehaviorX::terminate_send_socket();
 }
 
 void NetGate::NetGateActor::terminate_recv_socket() {
   auto bind_url = to_string("tcp://", bind_host, ':', bind_port);
   net_recv_socket.unbind(bind_url);
   net_recv_socket.close();
-  this->ActorBehavior::terminate_recv_socket();
+  this->ActorBehaviorX::terminate_recv_socket();
 }
 
 NetGate::NetGate(ActorSystem& actor_sys, const std::string& bind_host, int port) {

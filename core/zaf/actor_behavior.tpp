@@ -6,7 +6,7 @@ void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type,
   }
   receiver.visit(overloaded {
     [&](const LocalActorHandle& r) {
-      auto message = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+      auto message = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
       message->set_type(type);
       this->send(r, message);
     },
@@ -14,15 +14,15 @@ void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type,
       if constexpr (traits::all_serializable<ArgT ...>::value) {
         std::vector<char> bytes;
         Serializer(bytes)
-          .write(this->get_actor_id())
-          .write(r.remote_actor_id)
+          .write(this->get_local_actor_handle())
+          .write(r.remote_actor)
           .write(code)
           .write(type)
           .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
           .write(std::forward<ArgT>(args) ...);
         // Have to copy the bytes here because we do not know how many bytes
         // are needed for serialization and we need to reserve more than necessary.
-        this->send(r.net_sender_info->id, DefaultCodes::ForwardMessage, Message::Type::Normal,
+        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage, Message::Type::Normal,
           zmq::message_t{&bytes.front(), bytes.size()});
       } else {
         throw ZAFException("Attempt to serialize non-serializable message data.");
@@ -107,9 +107,9 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
     if (npoll == 0) {
       return false;
     }
-    zmq::message_t message_ptr;
+    zmq::message_t message_ptr, sender_routing_id;
     // receive current sender routing id
-    if (!recv_socket.recv(message_ptr)) {
+    if (!recv_socket.recv(sender_routing_id)) {
       throw ZAFException("Expect to receive a message but actually receive nothing.");
     }
     if (!recv_socket.recv(message_ptr)) {
@@ -136,7 +136,7 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
   auto send_time = now + delay;
   receiver.visit(overloaded{
     [&](const LocalActorHandle& r) {
-      auto m = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+      auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
       m->set_type(type);
       delayed_messages.emplace(send_time, DelayedMessage(receiver, m));
     },
@@ -144,8 +144,8 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
       if constexpr (traits::all_serializable<ArgT ...>::value) {
         std::vector<char> bytes;
         Serializer(bytes)
-          .write(this->get_actor_id())
-          .write(r.remote_actor_id)
+          .write(this->get_local_actor_handle())
+          .write(r.remote_actor)
           .write(code)
           .write(type)
           .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))

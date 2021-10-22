@@ -27,20 +27,22 @@ int main(int argc, char** argv) {
   std::thread machine_b([]() {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 23456};
-    auto y = actor_system.spawn([&, n = zaf::NetGateClient{gate.actor()}](zaf::ActorBehavior& self) {
+    auto y = actor_system.spawn([&, n = zaf::NetGateClient{gate.actor()}](zaf::ActorBehaviorX& self) {
       n.lookup_actor(self, "127.0.0.1:12345", "XActor");
       zaf::Actor x;
-      self.receive_once({
+      self.receive({
         n.on_lookup_actor_reply([&](std::string&, std::string&, zaf::Actor remote_x) {
           x = remote_x;
+          self.deactivate();
           LOG(INFO) << "Fetched remote actor X!";
         })
       });
       self.send(x, 1, std::string("hello"));
-      self.receive_once({
+      self.receive({
         zaf::Code{0} - [&](const std::string& world) {
           LOG(INFO) << "Expected world, received " << world;
-          self.send(self.get_current_sender_actor(), 2, std::string("hello world"));
+          self.reply(2, std::string("hello world"));
+          self.deactivate();
         }
       });
     });

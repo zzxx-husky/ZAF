@@ -40,7 +40,7 @@ public:
   constexpr static Code RetrieveActorRep      {NetGateCodeBase + 16};
 
 private:
-  class Receiver : public ActorBehavior {
+  class Receiver : public ActorBehaviorX {
   public:
     Receiver(const std::string bind_host, const NetSenderInfo& net_sender_info);
 
@@ -59,7 +59,7 @@ private:
     const NetSenderInfo& net_sender_info;
   };
 
-  class Sender : public ActorBehavior {
+  class Sender : public ActorBehaviorX {
   public:
     MessageHandlers behavior() override;
 
@@ -67,6 +67,7 @@ private:
     void terminate_send_socket() override;
 
     std::string connected_url;
+    zmq::socket_t net_send_socket;
     std::vector<zmq::message_t> pending_messages;
   };
 
@@ -77,7 +78,7 @@ private:
    * The key stored in peer's map: a.b.c.d:port
    * The url that Receivers created by this NetGateActor bind is a.b.c.d:*
    **/
-  class NetGateActor : public ActorBehavior {
+  class NetGateActor : public ActorBehaviorX {
   public:
     NetGateActor(const std::string& host, int port);
 
@@ -151,7 +152,7 @@ private:
     std::unordered_map<std::string, NetGateConn> net_gate_connections;
     struct LocalActor {
       // local registered actor, requests may come before local actor is registered
-      std::optional<Actor> actor;
+      std::optional<LocalActorHandle> actor;
       // remote actor requesters
       std::vector<std::string> requesters;
     };

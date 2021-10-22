@@ -70,13 +70,13 @@ public:
   // send a message to a ActorBehavior
   template<typename ... ArgT>
   inline void send(ActorBehavior& receiver, size_t code, ArgT&& ... args) {
-    this->send(LocalActorHandle{receiver.get_actor_id()},
+    this->send(receiver.get_local_actor_handle(),
       code, Message::Type::Normal, std::forward<ArgT>(args)...);
   }
 
   template<typename ... ArgT>
   inline void send(ActorBehavior& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    this->send(receiver.get_actor_id(), code, type, std::forward<ArgT>(args)...);
+    this->send(receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor
@@ -96,7 +96,7 @@ public:
 
   template<typename ... ArgT>
   inline void send(const LocalActorHandle& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    auto m = make_message(LocalActorHandle{this->get_actor_id()}, code, std::forward<ArgT>(args)...);
+    auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
     m->set_type(type);
     this->send(receiver, m);
   }
@@ -138,7 +138,7 @@ public:
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
     size_t code, ArgT&& ... args) {
-    this->delayed_send(delay, LocalActorHandle{receiver.get_actor_id()}, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+    this->delayed_send(delay, receiver.get_local_actor_handle(), code, Message::Type::Normal, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
@@ -202,6 +202,8 @@ public:
   virtual ~ActorBehavior();
 
   ActorIdType get_actor_id() const;
+
+  virtual LocalActorHandle get_local_actor_handle() const;
 
 protected:
   void connect(ActorIdType peer);
