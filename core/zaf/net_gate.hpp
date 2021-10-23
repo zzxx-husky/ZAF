@@ -69,6 +69,9 @@ private:
     std::string connected_url;
     zmq::socket_t net_send_socket;
     std::vector<zmq::message_t> pending_messages;
+
+  private:
+    bool forward_any_message = true;
   };
 
   /**

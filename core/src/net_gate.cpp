@@ -101,10 +101,19 @@ MessageHandlers NetGate::Sender::behavior() {
       pending_messages.clear();
     },
     NetGate::Termination - [&]() {
-      this->get_actor_system().dec_num_detached_actors();
-      this->deactivate();
+      if (forward_any_message) {
+        forward_any_message = false;
+        // In case that the last alive actor sends a message to NetSender
+        // and then immediately stops. Then the NetGate will be notified to terminate.
+        // The termination message may go faster than the message sent by the last alive actor.
+        this->delayed_send(std::chrono::milliseconds{1}, *this, NetGate::Termination);
+      } else {
+        this->get_actor_system().dec_num_detached_actors();
+        this->deactivate();
+      }
     },
     DefaultCodes::ForwardMessage - [&](zmq::message_t& msg_bytes) {
+      forward_any_message = true;
       if (this->connected_url.empty()) {
         pending_messages.emplace_back(std::move(msg_bytes));
       } else {
@@ -118,7 +127,7 @@ void NetGate::Sender::initialize_send_socket() {
   this->ActorBehaviorX::initialize_send_socket();
   net_send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::push);
   net_send_socket.set(zmq::sockopt::sndhwm, 0);
-  net_send_socket.set(zmq::sockopt::linger, 0);
+  // net_send_socket.set(zmq::sockopt::linger, 0);
 }
 
 void NetGate::Sender::terminate_send_socket() {
@@ -357,7 +366,7 @@ void NetGate::NetGateActor::initialize_send_socket() {
   auto routing_id = to_string(bind_host, ':', bind_port, "/s");
   net_send_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
   net_send_socket.set(zmq::sockopt::sndhwm, 0);
-  net_send_socket.set(zmq::sockopt::linger, 0);
+  // net_send_socket.set(zmq::sockopt::linger, 0);
 }
 
 void NetGate::NetGateActor::initialize_recv_socket() {

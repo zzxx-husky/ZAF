@@ -156,7 +156,7 @@ void ActorBehavior::initialize_send_socket() {
   // must set routing_id before connect
   send_socket.set(zmq::sockopt::routing_id, zmq::buffer(send_routing_id));
   send_socket.set(zmq::sockopt::sndhwm, 0);
-  send_socket.set(zmq::sockopt::linger, 0);
+  // send_socket.set(zmq::sockopt::linger, 0);
   // connect to self
   connected_receivers.insert(this->get_actor_id());
   connect(this->actor_id);

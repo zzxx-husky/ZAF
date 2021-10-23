@@ -115,4 +115,36 @@ ActorInfo Actor::to_actor_info(const Actor& requester) const {
   });
 }
 
+std::ostream& operator<<(std::ostream& out, const LocalActorHandle& a) {
+  if (a.local_actor_id) {
+    out << "Local{id: " << a.local_actor_id << ", swsr: " << a.use_swsr_msg_delivery << '}';
+  } else {
+    out << "Local{nullptr}";
+  }
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const NetSenderInfo& i) {
+  out << "NetSender{sender: " << i.net_sender << ", local url: " << i.local_net_gate_url
+    << ", remote url: " << i.remote_net_gate_url << '}';
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const RemoteActorHandle& a) {
+  out << "Remote{actor: " << a.remote_actor << ", net_sender: " << *a.net_sender_info << '}';
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const Actor& a) {
+  a.visit(overloaded{
+    [&](const LocalActorHandle& l) {
+      out << l;
+    },
+    [&](const RemoteActorHandle& r) {
+      out << r;
+    }
+  });
+  return out;
+}
+
 } // namespace zaf

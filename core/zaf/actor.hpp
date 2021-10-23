@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iostream>
 #include <functional>
 #include <string>
 #include <variant>
@@ -18,6 +19,7 @@ struct LocalActorHandle {
   operator bool() const;
   friend bool operator==(const LocalActorHandle&, const LocalActorHandle&);
   size_t hash_code() const;
+  friend std::ostream& operator<<(std::ostream&, const LocalActorHandle&);
 
   ActorIdType local_actor_id{0};
   bool use_swsr_msg_delivery{false};
@@ -40,6 +42,8 @@ struct NetSenderInfo {
   std::string local_net_gate_url;
   // the url of the remote net gate that creates the net receiver who receives the messages of this net sender
   std::string remote_net_gate_url;
+
+  friend std::ostream& operator<<(std::ostream&, const NetSenderInfo&);
 };
 
 struct RemoteActorHandle {
@@ -51,6 +55,7 @@ struct RemoteActorHandle {
   operator bool() const;
   friend bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b);
   size_t hash_code() const;
+  friend std::ostream& operator<<(std::ostream&, const RemoteActorHandle&);
 
   // `net_sender_info` is a reference
   const NetSenderInfo* net_sender_info = nullptr;
@@ -117,6 +122,8 @@ public:
   operator const RemoteActorHandle&() const;
 
   ActorInfo to_actor_info(const Actor& requester) const;
+
+  friend std::ostream& operator<<(std::ostream&, const Actor&);
 
 private:
   std::variant<
