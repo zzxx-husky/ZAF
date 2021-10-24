@@ -17,7 +17,7 @@ struct LocalActorHandle {
 
   LocalActorHandle(ActorIdType id, bool use_swsr);
   operator bool() const;
-  friend bool operator==(const LocalActorHandle&, const LocalActorHandle&);
+  bool operator==(const LocalActorHandle&) const;
   size_t hash_code() const;
   friend std::ostream& operator<<(std::ostream&, const LocalActorHandle&);
 
@@ -53,7 +53,7 @@ struct RemoteActorHandle {
 
   RemoteActorHandle(const NetSenderInfo&, const LocalActorHandle&);
   operator bool() const;
-  friend bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b);
+  bool operator==(const RemoteActorHandle& b) const;
   size_t hash_code() const;
   friend std::ostream& operator<<(std::ostream&, const RemoteActorHandle&);
 
@@ -100,7 +100,7 @@ public:
   ActorIdType get_actor_id() const;
 
   operator bool() const;
-  friend bool operator==(const Actor&, const Actor&);
+  bool operator==(const Actor&) const;
   size_t hash_code() const;
 
   bool is_remote() const;
@@ -125,7 +125,6 @@ public:
 
   friend std::ostream& operator<<(std::ostream&, const Actor&);
 
-private:
   std::variant<
     LocalActorHandle,
     RemoteActorHandle

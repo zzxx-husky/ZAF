@@ -13,6 +13,11 @@ if (NOT DEFINED ENABLE_PHMAP)
   set(ENABLE_PHMAP true)
 endif ()
 message("-- ENABLE_PHMAP: " ${ENABLE_PHMAP})
+if (NOT DEFINED ENABLE_PYZAF)
+  set(ENABLE_PYZAF true)
+endif ()
+message("-- ENABLE_PYZAF: " ${ENABLE_PHMAP})
+
 set(BasicLibs pthread rt)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -77,7 +82,9 @@ include_directories(core)
 set(ZAFSources ${CoreSources})
 set(ZAFHeaders ${CoreHeaders})
 add_library(zaf_static STATIC ${ZAFSources})
+target_link_libraries(zaf_static ${BasicLibs})
 add_library(zaf_shared SHARED ${ZAFSources})
+target_link_libraries(zaf_shared ${BasicLibs})
 set_target_properties(zaf_static PROPERTIES
   OUTPUT_NAME zaf
   VERSION ${PROJECT_VERSION})
@@ -98,3 +105,25 @@ install(DIRECTORY core/zaf/
   PATTERN "*.tpp")
 install(FILES ${CMAKE_BINARY_DIR}/zaf_dependencies
   DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+# https://gist.github.com/ndevenish/ff771feb6817f7debfa728386110f567
+if (${ENABLE_PYZAF})
+  find_package(PythonLibs 3.8 REQUIRED)
+  if (DEFINED ENV{BOOST_ROOT})
+    set(BOOST_ROOT $ENV{BOOST_ROOT})
+  endif ()
+  # Force to use shared libs instead of static libs
+  set(BUILD_SHARED_LIBS ON)
+  # set(Boost_NO_BOOST_CMAKE true)
+  find_package(Boost COMPONENTS python REQUIRED)
+  # Without this, any build libraries automatically have names "lib{x}.so"
+  set(CMAKE_SHARED_MODULE_PREFIX "")
+  add_library(pyzaf MODULE ${CMAKE_SOURCE_DIR}/core/python/zaf.cpp)
+  target_link_libraries(pyzaf
+    ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} zaf_shared)
+  target_include_directories(pyzaf PRIVATE ${PYTHON_INCLUDE_DIRS})
+
+  install(TARGETS pyzaf 
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif ()

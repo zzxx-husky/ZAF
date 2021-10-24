@@ -11,8 +11,8 @@ LocalActorHandle::operator bool() const {
   return local_actor_id;
 }
 
-bool operator==(const LocalActorHandle& a, const LocalActorHandle& b) {
-  return a.local_actor_id == b.local_actor_id;
+bool LocalActorHandle::operator==(const LocalActorHandle& b) const {
+  return this->local_actor_id == b.local_actor_id;
 }
 
 size_t LocalActorHandle::hash_code() const {
@@ -29,9 +29,9 @@ RemoteActorHandle::operator bool() const {
   return net_sender_info;
 }
 
-bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b) {
-  return a.net_sender_info == b.net_sender_info &&
-    a.remote_actor == b.remote_actor;
+bool RemoteActorHandle::operator==(const RemoteActorHandle& b) const {
+  return net_sender_info == b.net_sender_info &&
+    remote_actor == b.remote_actor;
 }
 
 size_t RemoteActorHandle::hash_code() const {
@@ -61,8 +61,8 @@ Actor::operator bool() const {
   return std::visit([](auto&& x) { return static_cast<bool>(x); }, handle);
 }
 
-bool operator==(const Actor& a, const Actor& b) {
-  return a.handle == b.handle;
+bool Actor::operator==(const Actor& b) const {
+  return handle == b.handle;
 }
 
 size_t Actor::hash_code() const {
