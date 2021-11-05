@@ -41,9 +41,9 @@ protected:
 
     DelayedMessage(const Actor& r, Message* m);
     DelayedMessage(const Actor& r, zmq::message_t&& m);
-    DelayedMessage(const DelayedMessage&) = default;
+    DelayedMessage(const DelayedMessage&) = delete;
     DelayedMessage(DelayedMessage&&) = default;
-    DelayedMessage& operator=(const DelayedMessage&) = default;
+    DelayedMessage& operator=(const DelayedMessage&) = delete;
     DelayedMessage& operator=(DelayedMessage&&) = default;
   };
 
@@ -144,7 +144,7 @@ public:
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
     size_t code, Message::Type type, ArgT&& ... args) {
-    this->delayed_send(delay, LocalActorHandle{receiver.get_actor_id()}, code, type, std::forward<ArgT>(args) ...);
+    this->delayed_send(delay, receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>

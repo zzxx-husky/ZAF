@@ -73,7 +73,7 @@ struct TypedMessage : public Message {
 
   SerializedMessage* serialize() const override;
 
-  void fill_with_element_addrs(std::vector<std::uintptr_t>& addrs) const {
+  void fill_with_element_addrs(std::vector<std::uintptr_t>& addrs) const override {
     fill_addrs<0, std::tuple_size<MessageContent>::value>(addrs);
   }
 
@@ -115,7 +115,7 @@ public:
   inline auto deseralize() {
     auto&& content = this->deserialize_content<ArgTypes>();
     auto m = new TypedMessage<decltype(content)>(
-      this->get_sender_actor(), this->code, std::move(content));
+      this->get_sender_actor(), this->get_code(), std::move(content));
     m->set_type(this->get_type());
     return m;
   }

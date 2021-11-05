@@ -35,7 +35,7 @@ void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type,
 // timeout == -1, block until receiving a message
 // timeout > 0, wait for specified timeout or until receiving a message
 template<typename Callback,
-  typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
+  typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>*>
 bool ActorBehavior::receive_once(Callback&& callback, long timeout) {
   timeout = std::max(timeout, long(-1));
   switch (timeout) {
@@ -89,7 +89,7 @@ bool ActorBehavior::receive_once(Callback&& callback, long timeout) {
 }
 
 template<typename Callback,
-  typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
+  typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>*>
 bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
   if (!waiting_for_response && !pending_messages.empty()) {
     callback(pending_messages.front());

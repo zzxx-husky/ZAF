@@ -6,7 +6,7 @@ defaults:
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, alpha ]
   pull_request:
     branches: [ master ]
 
@@ -25,12 +25,19 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install dependencies
+    - name: Installation
       run: |
+        echo "Install dependencies of ZAF"
         ${{github.workspace}}/scripts/install_libzmq.sh ${{github.workspace}}/../
         ${{github.workspace}}/scripts/install_gtest.sh ${{github.workspace}}/../
         ${{github.workspace}}/scripts/install_glog.sh ${{github.workspace}}/../
         ${{github.workspace}}/scripts/install_phmap.sh ${{github.workspace}}/../
+        echo "Install Clang"
+        sudo apt install clang
+        clang --version
+        clang++ --version
+        echo "Install Valgrind"
+        sudo apt install -y valgrind
 
     - name: Configure CMake
       # Configure CMake in a 'release' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -89,8 +96,22 @@ jobs:
     - name: Valgrind
       working-directory: ${{github.workspace}}/release
       run: |
-        sudo apt install -y valgrind
         valgrind ./examples/HelloWorld
         valgrind ./examples/HelloWorldX
         valgrind ./examples/HelloWorldByActorEngine
         valgrind ./examples/HelloWorldNetwork
+
+    - name: Compile with Clang
+      run: |
+        cmake -B ${{github.workspace}}/release_clang -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cd ${{github.workspace}}/release_clang
+        make all -j4
+        echo "Run HelloWorld"
+        ./examples/HelloWorld
+        echo "Run HelloWorldNetwork"
+        ./examples/HelloWorldNetwork
+        echo "Run HelloWorldByActorEngine"
+        ./examples/HelloWorldByActorEngine
+      env:
+        CC: clang
+        CXX: clang++
