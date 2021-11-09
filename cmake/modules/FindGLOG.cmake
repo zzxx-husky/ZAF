@@ -7,11 +7,9 @@ find_path(GLOG_INCLUDE_DIR
   HINTS ${GLOG_ROOT}/include
 )
 
-set(HINT_DIR ${GLOG_ROOT}/lib)
-
 find_library(GLOG_LIBRARY
-  NAMES glog libglog
-  HINTS ${HINT_DIR}
+  NAMES glog
+  HINTS ${GLOG_ROOT}/lib
 )
 
 include(FindPackageHandleStandardArgs)

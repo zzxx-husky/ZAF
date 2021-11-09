@@ -28,14 +28,16 @@ jobs:
     - name: Installation
       run: |
         echo "Install dependencies of ZAF"
-        ${{github.workspace}}/scripts/install_libzmq.sh ${{github.workspace}}/../
-        ${{github.workspace}}/scripts/install_gtest.sh ${{github.workspace}}/../
-        ${{github.workspace}}/scripts/install_glog.sh ${{github.workspace}}/../
-        ${{github.workspace}}/scripts/install_phmap.sh ${{github.workspace}}/../
+        cd ${{github.workspace}}/../
+        git clone --depth 1 https://github.com/zzxx-husky/inst_scripts
+        ./inst_scripts/install_zaf.sh --deps-only
+        cd ${{github.workspace}}
+
         echo "Install Clang"
         sudo apt install clang
         clang --version
         clang++ --version
+
         echo "Install Valgrind"
         sudo apt install -y valgrind
 
@@ -48,12 +50,11 @@ jobs:
         echo ${GTEST_ROOT}
         echo ${GLOG_ROOT}
         echo ${PHMAP_ROOT}
-        cmake -B ${{github.workspace}}/release -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake -S . -B ${{github.workspace}}/release -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
-      working-directory: ${{github.workspace}}/release
       # Build your program with the given configuration
-      run: make all -j4
+      run: cmake --build ${{github.workspace}}/release
 
     - name: Test
       working-directory: ${{github.workspace}}/release
