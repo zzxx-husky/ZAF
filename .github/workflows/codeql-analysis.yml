@@ -61,9 +61,9 @@ jobs:
 
     - name: Build
       run: |
-        . ${HOME}/.bashrc
+        source ${{github.workspace}}/../inst_scripts/instrc.sh
         cmake -S . -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-        cmake --build ${{github.workspace}}/build
+        cmake --build ${{github.workspace}}/build -j4
       shell: bash -ieo pipefail {0}
 
     - name: Perform CodeQL Analysis
