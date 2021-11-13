@@ -3,37 +3,34 @@
 namespace zaf {
 ActorBehaviorX::ActorBehaviorX() {
   ActorBehavior::inner_handlers.add_handlers(
-    DefaultCodes::SWSRMsgQueueRegistration - [&](SWSRDeliveryQueue<Message*>* queue) {
+    DefaultCodes::SWSRMsgQueueRegistration -
+    [&](std::shared_ptr<SWSRDeliveryQueue<Message*>>& queue) {
       this->register_swsr_queue(queue);
-      // this->setup_swsr_connection(this->get_current_sender_actor());
     },
     DefaultCodes::SWSRMsgQueueNotification - [&]() {
       this->notify_swsr_queue();
     },
     DefaultCodes::SWSRMsgQueueConsumption - [&]() {
       this->consume_swsr_recv_queues(ActorBehavior::inner_handlers.get_child_handlers());
+      this->post_swsr_consumption();
       if (!this->active_recv_queues.empty()) {
         this->ActorBehavior::send(*this, DefaultCodes::SWSRMsgQueueConsumption);
       }
-    },
-    DefaultCodes::SWSRMsgQueueTermination - [&]() {
-      auto sender_actor_id = this->get_current_sender_actor().get_actor_id();
-      auto iter = this->swsr_recv_queues.find(sender_actor_id);
-      if (iter->second->is_reading_by_reader) {
-        iter->second->is_writing_by_sender = false;
-      } else if (sender_actor_id != this->get_actor_id()) {
-        delete iter->second;
-      }
-      this->swsr_recv_queues.erase(iter);
     });
 }
 
 void ActorBehaviorX::initialize_actor(ActorSystem& sys, ActorGroup& group) {
   this->ActorBehavior::initialize_actor(sys, group);
   { // a queue for sending messages to self
-    this->self_swsr_queue.resize(15);
-    this->swsr_send_queues.emplace(this->get_actor_id(), &this->self_swsr_queue);
-    this->swsr_recv_queues.emplace(this->get_actor_id(), &this->self_swsr_queue);
+    this->self_swsr_queue = std::make_shared<SWSRDeliveryQueue<Message*>>();
+    this->self_swsr_queue->resize(15);
+    this->self_swsr_queue->destructor = [queue = this->self_swsr_queue.get()]() {
+      queue->pop_some([](Message* m) {
+        delete m;
+      }, queue->size());
+    };
+    this->swsr_send_queues.emplace(this->get_actor_id(), this->self_swsr_queue);
+    this->swsr_recv_queues.emplace(this->get_actor_id(), this->self_swsr_queue);
   }
 }
 
@@ -62,8 +59,12 @@ void ActorBehaviorX::send(const LocalActorHandle& actor, Message* m) {
        : SWSRDeliveryQueueFullStrategy::Blocking);
 }
 
-void ActorBehaviorX::register_swsr_queue(SWSRDeliveryQueue<Message*>* recv_queue) {
-  swsr_recv_queues.emplace(this->get_current_sender_actor().get_actor_id(), recv_queue);
+std::string ActorBehaviorX::get_name() const {
+  return to_string("ZAF/AX", this->get_actor_id());
+}
+
+void ActorBehaviorX::register_swsr_queue(std::shared_ptr<SWSRDeliveryQueue<Message*>>& recv_queue) {
+  swsr_recv_queues.emplace(this->get_current_sender_actor().get_actor_id(), std::move(recv_queue));
 }
 
 void ActorBehaviorX::notify_swsr_queue() {
@@ -71,28 +72,28 @@ void ActorBehaviorX::notify_swsr_queue() {
     this->ActorBehavior::send(*this, DefaultCodes::SWSRMsgQueueConsumption);
   }
   auto sender_id = this->get_current_sender_actor().get_actor_id();
-  active_recv_queues.push_back(swsr_recv_queues.at(sender_id));
-  active_recv_queues.back()->is_reading_by_reader = true;
+  active_recv_queues.emplace_back(sender_id, swsr_recv_queues.at(sender_id).get());
 }
 
 void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
+  Message* old_current_message = this->current_message;
+  this->current_message = nullptr;
   for (unsigned i = 0, n = active_recv_queues.size(); i < n; i++) {
     bool empty = false;
-    auto& recv_queue = active_recv_queues[i];
+    auto recv_queue = active_recv_queues[i].second;
     recv_queue->pop_some([&](Message* m) {
-      Message* old_current_message = this->current_message;
       this->current_message = m;
       try {
         handlers.process(*m);
       } catch (...) {
         std::throw_with_nested(ZAFException(
           "Exception caught when processing a message with code ", m->get_code(),
-          '(', std::hex, m->get_code(), ')'));
+          " (", std::hex, m->get_code(), ")."));
       }
       if (this->current_message) {
         delete this->current_message;
+        this->current_message = nullptr;
       }
-      this->current_message = old_current_message;
       if (!this->is_activated()) {
         recv_queue->stop_pop_some();
       }
@@ -100,10 +101,8 @@ void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
       empty = true;
     });
     if (empty) {
-      if (recv_queue->is_writing_by_sender) {
-        recv_queue->is_reading_by_reader = false;
-      } else {
-        delete recv_queue;
+      if (!recv_queue->is_writing_by_sender) {
+        this->swsr_recv_queues.erase(active_recv_queues[i].first);
       }
       active_recv_queues[i] = active_recv_queues.back();
       active_recv_queues.pop_back();
@@ -111,14 +110,18 @@ void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
       n--;
     }
   }
+  this->current_message = old_current_message;
 }
+
+void ActorBehaviorX::post_swsr_consumption() {}
 
 ActorBehaviorX::~ActorBehaviorX() {
   for (auto& id2queue : swsr_send_queues) {
-    this->ActorBehavior::send(LocalActorHandle{id2queue.first, false},
-      DefaultCodes::SWSRMsgQueueTermination);
+    id2queue.second->is_writing_by_sender = false;
   }
   swsr_send_queues.clear();
+  swsr_recv_queues.clear();
+  self_swsr_queue = nullptr;
 }
 
 void ActorBehaviorX::setup_swsr_connection(const Actor& x) {
@@ -140,9 +143,14 @@ void ActorBehaviorX::setup_swsr_connection(const LocalActorHandle& actor) {
   if (swsr_queue != nullptr) {
     return;
   }
-  swsr_queue = new SWSRDeliveryQueue<Message*>();
+  swsr_queue = std::make_shared<SWSRDeliveryQueue<Message*>>();
   // initialization for a new swsr queue
   swsr_queue->resize(15);
+  swsr_queue->destructor = [queue = swsr_queue.get()]() {
+    queue->pop_some([](Message* m) {
+      delete m;
+    }, queue->size());
+  };
   // send the queue from sender to receiver
   this->ActorBehavior::send(actor, DefaultCodes::SWSRMsgQueueRegistration, swsr_queue);
 }

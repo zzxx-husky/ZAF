@@ -26,6 +26,7 @@ public:
   constexpr static Code NetGateConnReq        {NetGateCodeBase + 1};
   constexpr static Code DataConnReq           {NetGateCodeBase + 2};
   constexpr static Code Termination           {NetGateCodeBase + 3};
+  constexpr static Code FlushBuffer           {NetGateCodeBase + 4};
   constexpr static Code ActorRegistration     {NetGateCodeBase + 5};
   constexpr static Code ActorLookupReq        {NetGateCodeBase + 6};
   constexpr static Code ActorLookupRep        {NetGateCodeBase + 7};
@@ -38,6 +39,8 @@ public:
   constexpr static Code PingRetry             {NetGateCodeBase + 14};
   constexpr static Code RetrieveActorReq      {NetGateCodeBase + 15};
   constexpr static Code RetrieveActorRep      {NetGateCodeBase + 16};
+  constexpr static Code NetGateBindPortReq    {NetGateCodeBase + 17};
+  constexpr static Code NetGateBindPortRep    {NetGateCodeBase + 18};
 
 private:
   class Receiver : public ActorBehaviorX {
@@ -53,7 +56,7 @@ private:
     void initialize_recv_socket() override;
     void terminate_recv_socket() override;
 
-  private:
+  protected:
     const std::string bind_host;
     zmq::socket_t net_recv_socket;
     const NetSenderInfo& net_sender_info;
@@ -66,12 +69,21 @@ private:
     void initialize_send_socket() override;
     void terminate_send_socket() override;
 
+    void push_to_buffer(MessageBytes& content);
+    void flush_byte_buffer();
+    void post_swsr_consumption() override;
+
+    std::string get_name() const override;
+
+  protected:
+    std::vector<char> byte_buffer;
+    unsigned num_buffered_messages = 0;
+
     std::string connected_url;
     zmq::socket_t net_send_socket;
-    std::vector<zmq::message_t> pending_messages;
-
-  private:
     bool forward_any_message = true;
+
+    std::vector<MessageBytes> pending_messages;
   };
 
   /**

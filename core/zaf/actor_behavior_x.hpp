@@ -58,18 +58,10 @@ public:
       },
       [&](const RemoteActorHandle& r) {
         if constexpr (traits::all_serializable<ArgT ...>::value) {
-          std::vector<char> bytes;
-          Serializer(bytes)
-            .write(this->get_local_actor_handle())
-            .write(r.remote_actor)
-            .write(code)
-            .write(type)
-            .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
-            .write(std::forward<ArgT>(args) ...);
-          // Have to copy the bytes here because we do not know how many bytes
-          // are needed for serialization and we need to reserve more than necessary.
-          this->send(r.net_sender_info->net_sender,
-            DefaultCodes::ForwardMessage, zmq::message_t{&bytes.front(), bytes.size()});
+          auto bytes = MessageBytes::make(this->get_local_actor_handle(),
+            r.remote_actor, code, type, std::forward<ArgT>(args) ...);
+          this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
+            Message::Type::Normal, std::move(bytes));
         } else {
           throw ZAFException("Attempt to serialize non-serializable message data.");
         }
@@ -92,11 +84,15 @@ public:
 
   void send(const LocalActorHandle& actor, Message* m);
 
-  void register_swsr_queue(SWSRDeliveryQueue<Message*>* recv_queue);
+  std::string get_name() const override;
+
+  void register_swsr_queue(std::shared_ptr<SWSRDeliveryQueue<Message*>>& recv_queue);
 
   void notify_swsr_queue();
 
   void consume_swsr_recv_queues(MessageHandlers& handlers);
+
+  virtual void post_swsr_consumption();
 
   void setup_swsr_connection(const Actor&);
 
@@ -105,13 +101,16 @@ public:
   ~ActorBehaviorX();
 
 private:
+  // Note(zzxx): Receiver may terminates before sender, we should use std::shared_ptr
+  //   so that sender will destroy the queue if it is the case.
   // SWSRDeliveryQueue is created by sender, then delivered to and destroyed by the receiver
   // Receiver actor id -> message queue
-  DefaultHashMap<ActorIdType, SWSRDeliveryQueue<Message*>*> swsr_send_queues;
+  DefaultHashMap<ActorIdType, std::shared_ptr<SWSRDeliveryQueue<Message*>>> swsr_send_queues;
   // Sender actor id -> message queue
-  DefaultHashMap<ActorIdType, SWSRDeliveryQueue<Message*>*> swsr_recv_queues;
+  DefaultHashMap<ActorIdType, std::shared_ptr<SWSRDeliveryQueue<Message*>>> swsr_recv_queues;
   // pointers in `active_recv_queues` points to the queues in `swsr_recv_queues`
-  std::vector<SWSRDeliveryQueue<Message*>*> active_recv_queues;
-  SWSRDeliveryQueue<Message*> self_swsr_queue;
+  std::vector<std::pair<ActorIdType, SWSRDeliveryQueue<Message*>*>> active_recv_queues;
+  // Make it as a shared_ptr so that it can be managed as like other queues
+  std::shared_ptr<SWSRDeliveryQueue<Message*>> self_swsr_queue;
 };
 } // namespace zaf

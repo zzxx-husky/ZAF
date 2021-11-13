@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <sstream>
 
 namespace zaf {
@@ -12,13 +13,13 @@ inline void to_string(std::ostringstream& oss, Arg&& arg);
 
 template<typename Arg, typename ... ArgT>
 inline void to_string(std::ostringstream& oss, Arg&& arg, ArgT&& ... args) {
-  oss << arg;
+  oss << std::forward<Arg>(arg);
   to_string(oss, std::forward<ArgT>(args) ...);
 }
 
 template<typename Arg>
 inline void to_string(std::ostringstream& oss, Arg&& arg) {
-  oss << arg;
+  oss << std::forward<Arg>(arg);
 }
 } // namespace impl
 

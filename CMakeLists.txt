@@ -13,6 +13,10 @@ if (NOT DEFINED ENABLE_PHMAP)
   set(ENABLE_PHMAP true)
 endif ()
 message("-- ENABLE_PHMAP: " ${ENABLE_PHMAP})
+if (NOT DEFINED ENABLE_TCMALLOC)
+  set(ENABLE_TCMALLOC true)
+endif ()
+message("-- ENABLE_TCMALLOC: " ${ENABLE_TCMALLOC})
 set(BasicLibs pthread rt)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -53,6 +57,17 @@ if (${ENABLE_PHMAP})
   set(ZAFDepsHeaders "${ZAFDepsHeaders};${PHMAP_ROOT_DIR}")
 endif ()
 
+if (${ENABLE_TCMALLOC})
+  if (DEFINED ENV{GPERF_ROOT})
+    set(GPERF_ROOT $ENV{GPERF_ROOT})
+  endif ()
+  find_package(Gperftools)
+  include_directories(${Gperftools_INCLUDE_DIRS})
+  set(BasicLibs ${BasicLibs} ${Gperftools_PROFILER} ${Gperftools_TCMALLOC})
+  set(ZAFDepsHeaders "${ZAFDepsHeaders};${Gperftools_INCLUDE_DIRS}")
+  set(ZAFDepsSources "${ZAFDepsSources};${Gperftools_PROFILER};${Gperftools_TCMALLOC}")
+endif ()
+
 add_subdirectory(core)
 
 if (${ENABLE_TEST})
@@ -77,10 +92,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/zaf_dependencies
 
 # make install
 include_directories(core)
-set(ZAFSources ${CoreSources})
 set(ZAFHeaders ${CoreHeaders})
-add_library(zaf_static STATIC ${ZAFSources})
-add_library(zaf_shared SHARED ${ZAFSources})
+add_library(zaf_static STATIC $<TARGET_OBJECTS:CoreObject>)
+add_library(zaf_shared SHARED $<TARGET_OBJECTS:CoreObject>)
 set_target_properties(zaf_static PROPERTIES
   OUTPUT_NAME zaf
   VERSION ${PROJECT_VERSION})

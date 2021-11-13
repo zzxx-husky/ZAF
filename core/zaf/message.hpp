@@ -98,7 +98,8 @@ private:
 template<typename ... ArgT>
 auto make_message(Actor sender, size_t code, ArgT&& ... args) {
   auto content = std::make_tuple(std::forward<ArgT>(args)...);
-  return new TypedMessage<decltype(content)>(sender, code, std::move(content));
+  auto m = new TypedMessage<decltype(content)>(sender, code, std::move(content));
+  return m;
 }
 
 struct SerializedMessage : public Message {

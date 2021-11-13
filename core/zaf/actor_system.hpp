@@ -10,6 +10,7 @@
 #include "actor_behavior.hpp"
 #include "actor_group.hpp"
 #include "scoped_actor.hpp"
+#include "thread_utils.hpp"
 
 #include "zmq.hpp"
 
@@ -41,6 +42,7 @@ public:
     auto new_actor = new ActorType();
     new_actor->initialize_actor(*this, *this);
     std::thread([run = std::forward<Callable>(callable), new_actor]() mutable {
+      thread::set_name(new_actor->get_name());
       try {
         run(*new_actor);
       } catch (const std::exception& e) {

@@ -27,6 +27,12 @@ public:
     add_handlers(std::forward<ArgT>(args) ...);
   }
 
+  template<typename CodeHandler, typename ... ArgT>
+  void update_handlers(CodeHandler&& code_handler, ArgT&& ... args) {
+    handlers[code_handler.first] = std::move(code_handler.second);
+    update_handlers(std::forward<ArgT>(args) ...);
+  }
+
   size_t size() const;
 
   void add_handlers();

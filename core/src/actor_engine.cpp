@@ -154,6 +154,7 @@ void ActorEngine::Executor::listen_to_actor(ActorBehavior* new_actor, MessageHan
 }
 
 void ActorEngine::Executor::launch() {
+  thread::set_name(to_string("ZAF/E", this->get_actor_id()));
   listen_to_actor(this, this->behavior());
   this->activate();
   while (true) {

@@ -1,5 +1,6 @@
 #include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
+#include "zaf/thread_utils.hpp"
 #include "zaf/zaf_exception.hpp"
 
 namespace zaf {
@@ -8,9 +9,48 @@ ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, Message* m):
   message(m) {
 }
 
-ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, zmq::message_t&& m):
+ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, MessageBytes&& m):
   receiver(r),
   message(std::move(m)) {
+}
+
+ActorBehavior::DelayedMessage::DelayedMessage(ActorBehavior::DelayedMessage&& m):
+  receiver(std::move(m.receiver)) {
+  std::visit(overloaded {
+    [&](Message*& msg) {
+      this->message = msg;
+      msg = nullptr;
+    },
+    [&](MessageBytes& bytes) {
+      this->message = std::move(bytes);
+    }
+  }, m.message);
+}
+
+ActorBehavior::DelayedMessage&
+ActorBehavior::DelayedMessage::operator=(ActorBehavior::DelayedMessage&& m) {
+  this->receiver = std::move(m.receiver);
+  std::visit(overloaded {
+    [&](Message*& msg) {
+      this->message = msg;
+      msg = nullptr;
+    },
+    [&](MessageBytes& bytes) {
+      this->message = std::move(bytes);
+    }
+  }, m.message);
+  return *this;
+}
+
+ActorBehavior::DelayedMessage::~DelayedMessage() {
+  std::visit(overloaded {
+    [&](Message* m) {
+      if (m) {
+        delete m;
+      }
+    },
+    [&](auto&&) {}
+  }, message);
 }
 
 void ActorBehavior::start() {}
@@ -51,6 +91,10 @@ void ActorBehavior::deactivate() {
 
 bool ActorBehavior::is_activated() const {
   return this->activated;
+}
+
+std::string ActorBehavior::get_name() const {
+  return to_string("ZAF/A", this->get_actor_id());
 }
 
 void ActorBehavior::send(const LocalActorHandle& receiver, Message* m) {
@@ -114,7 +158,7 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
     } catch (...) {
       std::throw_with_nested(ZAFException(
         "Exception caught when processing a message with code ", m->get_code(),
-        '(', std::hex, m->get_code(), ')'));
+        " (", std::hex, m->get_code(), ")."));
     }
     if (this->current_message) {
       delete this->current_message;
@@ -141,12 +185,16 @@ void ActorBehavior::initialize_recv_socket() {
   // must set routing_id before bind
   recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(recv_routing_id));
   recv_socket.bind("inproc://" + recv_routing_id);
+  recv_poll_items.emplace_back(zmq::pollitem_t{
+    recv_socket.handle(), 0, ZMQ_POLLIN, 0
+  });
 }
 
 void ActorBehavior::terminate_recv_socket() {
   auto recv_routing_id = get_routing_id(this->actor_id, false);
   recv_socket.unbind("inproc://" + recv_routing_id);
   recv_socket.close();
+  recv_poll_items.clear();
 }
 
 void ActorBehavior::initialize_send_socket() {
@@ -206,6 +254,7 @@ zmq::socket_t& ActorBehavior::get_send_socket() {
 }
 
 void ActorBehavior::launch() {
+  thread::set_name(this->get_name());
   this->activate();
   this->start();
   if (this->is_activated()) {
@@ -217,6 +266,18 @@ void ActorBehavior::launch() {
 void ActorBehavior::terminate_actor() {
   if (!actor_system_ptr) {
     return;
+  }
+  for (auto& m : pending_messages) {
+    delete m;
+  }
+  pending_messages.clear();
+  delayed_messages.clear();
+  while (true) {
+    // a workaround to avoid memory leak on messages because the receiver
+    // actor is terminated and messages are not processed and freed.
+    if (!this->inner_receive_once([](Message* m) { delete m; }, 1)) {
+      break;
+    }
   }
   terminate_send_socket();
   terminate_recv_socket();
@@ -288,7 +349,7 @@ void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
       } catch (...) {
         std::throw_with_nested(ZAFException(
           "Exception caught when processing a message with code ", m->get_code(),
-          '(', std::hex, m->get_code(), ')'));
+          " (", std::hex, m->get_code(), ")."));
       }
       if (self.current_message) {
         delete self.current_message;
@@ -317,14 +378,15 @@ void ActorBehavior::flush_delayed_messages() {
          delayed_messages.begin()->first <= std::chrono::steady_clock::now()) {
     auto& msg = delayed_messages.begin()->second;
     std::visit(overloaded{
-      [&](Message* m) {
+      [&](Message*& m) {
         LocalActorHandle& r = msg.receiver;
         this->send(r, m);
+        m = nullptr;
       },
-      [&](zmq::message_t& m) {
+      [&](MessageBytes& m) {
         RemoteActorHandle& r = msg.receiver;
-        this->send(r.net_sender_info->net_sender,
-          DefaultCodes::ForwardMessage, std::move(m));
+        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
+          Message::Type::Normal, std::move(m.header), std::move(m.content));
       }
     }, msg.message);
     delayed_messages.erase(delayed_messages.begin());

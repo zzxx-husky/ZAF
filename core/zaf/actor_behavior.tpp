@@ -12,18 +12,10 @@ void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type,
     },
     [&](const RemoteActorHandle& r) {
       if constexpr (traits::all_serializable<ArgT ...>::value) {
-        std::vector<char> bytes;
-        Serializer(bytes)
-          .write(this->get_local_actor_handle())
-          .write(r.remote_actor)
-          .write(code)
-          .write(type)
-          .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
-          .write(std::forward<ArgT>(args) ...);
-        // Have to copy the bytes here because we do not know how many bytes
-        // are needed for serialization and we need to reserve more than necessary.
-        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage, Message::Type::Normal,
-          zmq::message_t{&bytes.front(), bytes.size()});
+        auto bytes = MessageBytes::make(this->get_local_actor_handle(),
+          r.remote_actor, code, type, std::forward<ArgT>(args) ...);
+        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
+          Message::Type::Normal, std::move(bytes));
       } else {
         throw ZAFException("Attempt to serialize non-serializable message data.");
       }
@@ -96,13 +88,10 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
     pending_messages.pop_front();
     return true;
   }
-  zmq::pollitem_t item[1] = {
-    {recv_socket.handle(), 0, ZMQ_POLLIN, 0}
-  };
   try {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    int npoll = zmq::poll(item, 1, timeout);
+    int npoll = zmq::poll(&recv_poll_items.front(), recv_poll_items.size(), timeout);
 #pragma GCC diagnostic pop
     if (npoll == 0) {
       return false;
@@ -142,17 +131,10 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
     },
     [&](const RemoteActorHandle& r) {
       if constexpr (traits::all_serializable<ArgT ...>::value) {
-        std::vector<char> bytes;
-        Serializer(bytes)
-          .write(this->get_local_actor_handle())
-          .write(r.remote_actor)
-          .write(code)
-          .write(type)
-          .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
-          .write(std::forward<ArgT>(args) ...);
         delayed_messages.emplace(send_time, DelayedMessage(
           receiver,
-          zmq::message_t{&bytes.front(), bytes.size()}
+          MessageBytes::make(this->get_local_actor_handle(),
+            r.remote_actor, code, type, std::forward<ArgT>(args) ...)
         ));
       } else {
         throw ZAFException("Attempt to serialize non-serializable data");

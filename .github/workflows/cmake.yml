@@ -38,9 +38,6 @@ jobs:
         clang --version
         clang++ --version
 
-        echo "Install Valgrind"
-        sudo apt install -y valgrind
-
     - name: Configure CMake
       # Configure CMake in a 'release' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
@@ -50,6 +47,7 @@ jobs:
         echo ${GTEST_ROOT}
         echo ${GLOG_ROOT}
         echo ${PHMAP_ROOT}
+        echo ${GPERF_ROOT}
         cmake -S . -B ${{github.workspace}}/release -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
@@ -66,42 +64,48 @@ jobs:
       working-directory: ${{github.workspace}}/release
       run: |
         echo "Run HelloWorld"
-        ./examples/HelloWorld
+        timeout 10 ./examples/HelloWorld
         echo "Run HelloWorldX"
-        ./examples/HelloWorldX
+        timeout 10 ./examples/HelloWorldX
         echo "Run HelloWorldNetwork"
-        ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorldNetwork
         echo "Run HelloWorldByActorEngine"
-        ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine
         echo "Run Shuffle"
-        ./examples/Shuffle
+        timeout 20 ./examples/Shuffle
         echo "Run ShuffleX"
-        ./examples/ShuffleX
+        timeout 20 ./examples/ShuffleX
         echo "Run LoadRebalance"
-        ./examples/LoadRebalance
+        timeout 20 ./examples/LoadRebalance
         echo "RUn ActorDelivery"
-        ./examples/ActorDelivery
+        timeout 20 ./examples/ActorDelivery
 
     - name: BuildMini
       run: |
         source ${{github.workspace}}/../inst_scripts/instrc.sh
-        cmake -S . -B ${{github.workspace}}/release_mini -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_TEST=false -DENABLE_PHMAP=false
+        cmake -S . -B ${{github.workspace}}/release_mini\
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}\
+          -DENABLE_TEST=OFF\
+          -DENABLE_PHMAP=OFF\
+          -DENABLE_TCMALLOC=OFF
         cmake --build ${{github.workspace}}/release_mini -j4
         cd ${{github.workspace}}/release_mini
         echo "Run HelloWorld"
-        ./examples/HelloWorld
-        echo "Run HelloWorldNetwork"
-        ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorld
+        echo "Run HelloWorldX"
+        timeout 10 ./examples/HelloWorldX
         echo "Run HelloWorldByActorEngine"
-        ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine
+        echo "Run HelloWorldNetwork"
+        timeout 10 ./examples/HelloWorldNetwork
 
-    - name: Valgrind
+    - name: Gperftools Heap Profile
       working-directory: ${{github.workspace}}/release
       run: |
-        valgrind ./examples/HelloWorld
-        valgrind ./examples/HelloWorldX
-        valgrind ./examples/HelloWorldByActorEngine
-        valgrind ./examples/HelloWorldNetwork
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorld
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldX
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldByActorEngine
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldNetwork
 
     - name: Compile with Clang
       run: |
@@ -110,11 +114,13 @@ jobs:
         cmake --build ${{github.workspace}}/release_clang -j4
         cd ${{github.workspace}}/release_clang
         echo "Run HelloWorld"
-        ./examples/HelloWorld
-        echo "Run HelloWorldNetwork"
-        ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorld
+        echo "Run HelloWorldX"
+        timeout 10 ./examples/HelloWorldX
         echo "Run HelloWorldByActorEngine"
-        ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine
+        echo "Run HelloWorldNetwork"
+        timeout 10 ./examples/HelloWorldNetwork
       env:
         CC: clang
         CXX: clang++

@@ -32,22 +32,60 @@ class ActorBehavior {
 protected:
   using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
+public:
+  struct MessageBytes {
+    std::vector<char> header;
+    std::vector<char> content;
+
+    MessageBytes() = default;
+    MessageBytes(const MessageBytes&) = delete;
+    MessageBytes(MessageBytes&&) = default;
+    MessageBytes& operator=(const MessageBytes&) = delete;
+    MessageBytes& operator=(MessageBytes&&) = default;
+
+    template<typename ... ArgT>
+    static MessageBytes make(const LocalActorHandle& send, const LocalActorHandle& recv,
+      size_t code, Message::Type type, ArgT&& ... args) {
+      MessageBytes bytes;
+      bytes.header.reserve(
+        LocalActorHandle::SerializationSize +
+        LocalActorHandle::SerializationSize +
+        sizeof(code) +
+        sizeof(type) +
+        sizeof(size_t) +
+        sizeof(unsigned)
+      );
+      Serializer(bytes.header)
+        .write(send)
+        .write(recv)
+        .write(code)
+        .write(type)
+        .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...));
+      Serializer(bytes.content)
+        .write(std::forward<ArgT>(args) ...);
+      Serializer(bytes.header)
+        .write(static_cast<unsigned>(bytes.content.size()));
+      return bytes;
+    }
+  };
+
   struct DelayedMessage {
     Actor receiver;
     std::variant<
       Message*,
-      zmq::message_t
+      MessageBytes
     > message;
 
     DelayedMessage(const Actor& r, Message* m);
-    DelayedMessage(const Actor& r, zmq::message_t&& m);
+    DelayedMessage(const Actor& r, MessageBytes&& m);
     DelayedMessage(const DelayedMessage&) = delete;
-    DelayedMessage(DelayedMessage&&) = default;
+    DelayedMessage(DelayedMessage&&);
     DelayedMessage& operator=(const DelayedMessage&) = delete;
-    DelayedMessage& operator=(DelayedMessage&&) = default;
+    DelayedMessage& operator=(DelayedMessage&&);
+
+    ~DelayedMessage();
   };
 
-public:
   ActorBehavior() = default;
 
   /**
@@ -169,7 +207,6 @@ public:
     return RequestHelper{*this};
   }
 
-
   ActorSystem& get_actor_system();
   ActorGroup& get_actor_group();
   Actor get_self_actor();
@@ -179,6 +216,8 @@ public:
   void activate();
   void deactivate();
   bool is_activated() const;
+
+  virtual std::string get_name() const;
 
   /**
    * To be used by ZAF
@@ -227,6 +266,7 @@ protected:
 
   ActorIdType actor_id{~0u};
   zmq::socket_t send_socket, recv_socket;
+  std::vector<zmq::pollitem_t> recv_poll_items;
   ActorGroup* actor_group_ptr = nullptr;
   ActorSystem* actor_system_ptr = nullptr;
 

@@ -13,6 +13,7 @@ namespace zaf {
  * 2. Register actor
  *    NetGate::register_actor(std::string name, actor);
  * 3. Retrieve Actor based on ActorInfo
+ * 4. Bind port lookup
  **/
 struct NetGateClient {
   const Actor net_gate_actor;
@@ -50,6 +51,20 @@ struct NetGateClient {
     typename std::enable_if_t<std::is_invocable_v<Handler, ActorInfo&, Actor&>>* = nullptr>
   inline auto on_retrieve_actor_reply(Handler&& handler) const {
     return NetGate::RetrieveActorRep - std::forward<Handler>(handler);
+  }
+
+  // 4. Query the port NetGate binds on
+  template<typename ActorLike>
+  inline decltype(auto) request_bind_port(ActorLike&& self) const {
+    return self.send(net_gate_actor, NetGate::NetGateBindPortReq);
+  }
+
+  template<typename Handler,
+    typename Sig = traits::is_callable<Handler>,
+    typename std::enable_if_t<Sig::value>* = nullptr,
+    typename std::enable_if_t<std::is_invocable_v<Handler, int>>* = nullptr>
+  inline auto on_bind_port_reply(Handler&& handler) const {
+    return NetGate::NetGateBindPortRep - std::forward<Handler>(handler);
   }
 };
 

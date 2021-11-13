@@ -1,4 +1,5 @@
 #include "zaf/net_gate.hpp"
+#include "zaf/thread_utils.hpp"
 
 namespace zaf {
 NetGate::Receiver::Receiver(const std::string bind_host, const NetSenderInfo& net_sender_info):
@@ -12,40 +13,53 @@ MessageHandlers NetGate::Receiver::behavior() {
       this->get_actor_system().dec_num_detached_actors();
       this->deactivate();
     },
-    NetGate::BindPortReq - [&](const std::string& url) {
+    NetGate::BindPortReq - [&]() {
       // `endpoint` is in the format of `tcp://a.b.c.d:port`
       auto endpoint = net_recv_socket.get(zmq::sockopt::last_endpoint);
       auto pos = endpoint.find_last_of(':');
       auto bind_port = std::stoi(endpoint.substr(pos + 1, endpoint.size() - pos - 1));
-      this->reply(BindPortRep, url, bind_port);
+      this->reply(BindPortRep, bind_port);
     }
   };
 }
 
 void NetGate::Receiver::receive_once_from_net() {
-  zmq::message_t bytes;
-  if (!net_recv_socket.recv(bytes)) {
+  zmq::message_t message;
+  if (!net_recv_socket.recv(message)) {
     throw ZAFException(
-      "Failed to receive message bytes after receiving an routing id at ", __PRETTY_FUNCTION__
+      "Failed to receive message (number of messages) as expected at ",
+      __PRETTY_FUNCTION__
     );
   }
-  Deserializer s((const char*) bytes.data());
-  auto send_actor = deserialize<LocalActorHandle>(s);
-  auto recv_actor = deserialize<LocalActorHandle>(s);
-  auto message_code = deserialize<size_t>(s);
-  auto message_type = deserialize<Message::Type>(s);
-  auto types_hash = deserialize<size_t>(s);
-  this->send(recv_actor, new TypedSerializedMessage<zmq::message_t>(
-    Actor{RemoteActorHandle{net_sender_info, send_actor}},
-    message_code,
-    message_type,
-    types_hash,
-    std::move(bytes),
-    LocalActorHandle::SerializationSize + LocalActorHandle::SerializationSize + sizeof(size_t) + sizeof(Message::Type) + sizeof(size_t)
-  ));
+  unsigned num_messages = *static_cast<unsigned*>(message.data());
+  if (!net_recv_socket.recv(message)) {
+    throw ZAFException(
+      "Failed to receive message (message bytes) as expected at ",
+      __PRETTY_FUNCTION__
+    );
+  }
+  Deserializer s(static_cast<const char*>(message.data()));
+  for (unsigned i = 0; i < num_messages; i++) {
+    auto send_actor = deserialize<LocalActorHandle>(s);
+    auto recv_actor = deserialize<LocalActorHandle>(s);
+    auto message_code = deserialize<size_t>(s);
+    auto message_type = deserialize<Message::Type>(s);
+    auto types_hash = deserialize<size_t>(s);
+    auto num_bytes = deserialize<unsigned>(s);
+    auto bytes = std::vector<char>(num_bytes);
+    s.read_bytes(&bytes.front(), num_bytes);
+    this->send(recv_actor, new TypedSerializedMessage<std::vector<char>>(
+      Actor{RemoteActorHandle{net_sender_info, send_actor}},
+      message_code,
+      message_type,
+      types_hash,
+      std::move(bytes)
+    ));
+  }
 }
 
 void NetGate::Receiver::launch() {
+  thread::set_name(to_string("ZAF/NGR", this->get_actor_id()));
   std::vector<zmq::pollitem_t> poll_items{
     {net_recv_socket.handle(), 0, ZMQ_POLLIN, 0},
     {this->get_recv_socket().handle(), 0, ZMQ_POLLIN, 0}
@@ -96,13 +110,13 @@ MessageHandlers NetGate::Sender::behavior() {
         ));
       }
       for (auto& m : pending_messages) {
-        net_send_socket.send(m, zmq::send_flags::none);
+        push_to_buffer(m);
       }
       pending_messages.clear();
     },
     NetGate::Termination - [&]() {
       if (forward_any_message) {
-        forward_any_message = false;
+        forward_any_message = !pending_messages.empty();
         // In case that the last alive actor sends a message to NetSender
         // and then immediately stops. Then the NetGate will be notified to terminate.
         // The termination message may go faster than the message sent by the last alive actor.
@@ -112,22 +126,52 @@ MessageHandlers NetGate::Sender::behavior() {
         this->deactivate();
       }
     },
-    DefaultCodes::ForwardMessage - [&](zmq::message_t& msg_bytes) {
+    NetGate::FlushBuffer - [&]() {
+      this->flush_byte_buffer();
+    },
+    DefaultCodes::ForwardMessage - [&](MessageBytes& bytes) {
       forward_any_message = true;
       if (this->connected_url.empty()) {
-        pending_messages.emplace_back(std::move(msg_bytes));
+        pending_messages.emplace_back(std::move(bytes));
       } else {
-        net_send_socket.send(msg_bytes, zmq::send_flags::none);
+        push_to_buffer(bytes);
       }
     }
   };
+}
+
+void NetGate::Sender::push_to_buffer(MessageBytes& bytes) {
+  // A simple bufferring. Bytes will be sent in `post_swsr_consumption`.
+  byte_buffer.insert(byte_buffer.end(), bytes.header.begin(), bytes.header.end());
+  byte_buffer.insert(byte_buffer.end(), bytes.content.begin(), bytes.content.end());
+  if (num_buffered_messages++ == 0) {
+    this->ActorBehavior::send(*this, FlushBuffer);
+  }
+}
+
+void NetGate::Sender::flush_byte_buffer() {
+  if (num_buffered_messages != 0) {
+    zmq::const_buffer num{&num_buffered_messages, sizeof(num_buffered_messages)};
+    net_send_socket.send(num, zmq::send_flags::sndmore);
+    zmq::const_buffer bytes{&byte_buffer.front(), byte_buffer.size()};
+    net_send_socket.send(bytes, zmq::send_flags::none);
+    byte_buffer.clear();
+    num_buffered_messages = 0;
+  }
+}
+
+void NetGate::Sender::post_swsr_consumption() {
+  this->flush_byte_buffer();
+}
+
+std::string NetGate::Sender::get_name() const {
+  return to_string("ZAF/NGS", this->get_actor_id());
 }
 
 void NetGate::Sender::initialize_send_socket() {
   this->ActorBehaviorX::initialize_send_socket();
   net_send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::push);
   net_send_socket.set(zmq::sockopt::sndhwm, 0);
-  // net_send_socket.set(zmq::sockopt::linger, 0);
 }
 
 void NetGate::Sender::terminate_send_socket() {
@@ -149,6 +193,12 @@ MessageHandlers NetGate::NetGateActor::behavior() {
     NetGate::NetGateConnReq - [&](const std::string& host, const int port) {
       this->establish_connection(to_string(host, ':', port));
     },
+    NetGate::NetGateBindPortReq - [&]() {
+      auto endpoint = net_recv_socket.get(zmq::sockopt::last_endpoint);
+      auto pos = endpoint.find_last_of(':');
+      int bind_port = std::stoi(endpoint.substr(pos + 1, endpoint.size() - pos - 1));
+      this->reply(NetGateBindPortRep, bind_port);
+    },
     NetGate::DataConnReq - [&](const std::string& connect_host, int connect_port) {
       std::string net_gate_url{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
       auto& s = [&]() -> auto& {
@@ -161,10 +211,6 @@ MessageHandlers NetGate::NetGateActor::behavior() {
         }
       }();
       this->send(s, NetGate::DataConnReq, connect_host, connect_port);
-    },
-    // tell the peer the port that is used by the recv socket for this `url`
-    NetGate::BindPortRep - [&](const std::string& url, int port) {
-      this->send_to_net_gate(url, NetGate::DataConnReq, this->bind_host, port);
     },
     NetGate::ActorRegistration - [&](const std::string& name, const Actor& actor) {
       actor.visit(overloaded {
@@ -182,7 +228,6 @@ MessageHandlers NetGate::NetGateActor::behavior() {
           throw ZAFException("Failed to register actor with name ", name, " because it is not a local actor.");
         }
       });
-      
     },
     // `url` in the format of "a.b.c.d:port"
     NetGate::ActorLookupReq - [&](const std::string& url, const std::string& name) {
@@ -319,11 +364,16 @@ bool NetGate::NetGateActor::establish_connection(const std::string& url) {
   actor_sys.inc_num_detached_actors();
   // 3. Ask the receiver which port it binds
   auto& r = iter_ins.first->second.receiver;
-  this->send(r, NetGate::BindPortReq, url);
+  this->request(r, NetGate::BindPortReq).on_reply({
+    NetGate::BindPortRep - [&](int port) {
+      this->send_to_net_gate(url, NetGate::DataConnReq, this->bind_host, port);
+    }
+  });
   return true;
 }
 
 void NetGate::NetGateActor::launch() {
+  thread::set_name(to_string("ZAF/NG", this->get_actor_id()));
   {
     this->get_actor_system().add_terminator([&](auto& sys) {
       sys->send(*this, NetGate::Termination);

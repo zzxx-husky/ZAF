@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <iostream>
 #include <thread>
 #include <type_traits>
@@ -52,12 +53,14 @@ public:
   // only accessed by the reader
   // when `num_empty_read` equals to `max_empty_read`, reader changes `may_have_message` to false
   unsigned num_empty_read = 0;
+  // updated by the writer
   bool is_writing_by_sender = true;
-  bool is_reading_by_reader = false;
 
   // configurations
   unsigned max_messages_read = 100;
   unsigned max_empty_read = 100;
+
+  std::function<void()> destructor = nullptr;
 
   SWSRDeliveryQueue() = default;
 
@@ -267,6 +270,12 @@ public:
 
   void stop_pop_some() {
     this->flag_stop_pop_some = true;
+  }
+
+  ~SWSRDeliveryQueue() {
+    if (destructor) {
+      destructor();
+    }
   }
 
   friend std::ostream& operator<<(std::ostream& out, const SWSRDeliveryQueue<Item>& item) {
