@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "actor.hpp"
+#include "count_pointer.hpp"
 #include "message_handlers.hpp"
 #include "zaf_exception.hpp"
 
@@ -103,6 +104,15 @@ public:
       : Message::Type::Normal;
     this->send(this->get_current_message().get_sender_actor(),
       code, type, std::forward<ArgT>(args)...);
+  }
+
+  // reply a message to the sender of the `msg`
+  template<typename ... ArgT>
+  inline void reply(Message& msg, size_t code, ArgT&& ... args) {
+    auto type = msg.get_type() == Message::Type::Request
+      ? Message::Type::Response
+      : Message::Type::Normal;
+    this->send(msg.get_sender_actor(), code, type, std::forward<ArgT>(args) ...);
   }
 
   // send a message to a ActorBehavior
@@ -203,15 +213,18 @@ public:
 
   template<typename Receiver, typename ... ArgT>
   inline RequestHelper request(Receiver&& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Request, std::forward<ArgT>(args) ...);
-    return RequestHelper{*this};
+    this->send(receiver, code, Message::Type::Request,
+      std::forward<ArgT>(args) ...);
+    return {*this};
   }
 
   ActorSystem& get_actor_system();
   ActorGroup& get_actor_group();
   Actor get_self_actor();
-  Message& get_current_message() const;
   Actor get_current_sender_actor() const;
+
+  CountPointer<Message> take_current_message();
+  const Message& get_current_message() const;
 
   void activate();
   void deactivate();

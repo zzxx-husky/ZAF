@@ -28,6 +28,17 @@ public:
     }
   }
 
+  // reply a message to the sender of the `msg`
+  template<typename ... ArgT>
+  inline void reply(Message& msg, size_t code, ArgT&& ... args) {
+    if (msg.get_type() == Message::Type::Request) {
+      this->ActorBehavior::reply(msg, code, std::forward<ArgT>(args) ...);
+    } else {
+      this->send(msg.get_sender_actor(),
+        code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+    }
+  }
+
   // send a message to a ActorBehavior
   template<typename ... ArgT>
   inline void send(const ActorBehavior& receiver, size_t code, ArgT&& ... args) {

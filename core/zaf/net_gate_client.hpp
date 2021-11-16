@@ -33,6 +33,17 @@ struct NetGateClient {
     return NetGate::ActorLookupRep - std::forward<Handler>(handler);
   }
 
+  template<typename Handler,
+    typename Sig = traits::is_callable<Handler>,
+    typename std::enable_if_t<Sig::value>* = nullptr,
+    typename std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
+  inline auto on_lookup_actor_reply(Handler&& handler) const {
+    return NetGate::ActorLookupRep -
+    [h = std::forward<Handler>(handler)](std::string&, std::string&, Actor& actor) {
+      h(actor);
+    };
+  }
+
   // 2. register actor
   template<typename ActorLike>
   inline decltype(auto) register_actor(ActorLike&& self, const std::string& name, const Actor& actor) const {

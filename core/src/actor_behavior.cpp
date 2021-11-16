@@ -1,5 +1,6 @@
 #include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
+#include "zaf/count_pointer.hpp"
 #include "zaf/thread_utils.hpp"
 #include "zaf/zaf_exception.hpp"
 
@@ -71,7 +72,19 @@ Actor ActorBehavior::get_self_actor() {
   return {get_local_actor_handle()};
 }
 
-Message& ActorBehavior::get_current_message() const {
+CountPointer<Message> ActorBehavior::take_current_message() {
+  if (!this->current_message) {
+    throw ZAFException("Attempt to take null message.");
+  }
+  CountPointer<Message> msg{this->current_message};
+  this->current_message = nullptr;
+  return msg;
+}
+
+const Message& ActorBehavior::get_current_message() const {
+  if (!this->current_message) {
+    throw ZAFException("Attempt to get null message.");
+  }
   return *this->current_message;
 }
 

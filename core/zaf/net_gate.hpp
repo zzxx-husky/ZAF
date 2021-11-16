@@ -154,8 +154,11 @@ private:
       NetSenderInfo net_sender_info;
       // whether `pong` message is received, i.e., whether the connection is well established.
       bool is_ponged = false;
-      // remote actor name -> local actor requesters
-      std::unordered_map<std::string, std::vector<Actor>> actor_lookup_requesters;
+      // remote actor name -> request message (which contains the requesters)
+      std::unordered_map<
+        std::string,
+        std::vector<CountPointer<Message>>
+      > actor_lookup_requesters;
       // a buffer storing messages that are pending and waiting for the `pong` message from peer net gate
       std::vector<zmq::message_t> pending_messages;
 

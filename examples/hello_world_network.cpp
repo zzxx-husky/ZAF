@@ -28,9 +28,8 @@ int main(int argc, char** argv) {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 23456};
     auto y = actor_system.spawn([&, n = zaf::NetGateClient{gate.actor()}](zaf::ActorBehaviorX& self) {
-      n.lookup_actor(self, "127.0.0.1:12345", "XActor");
       zaf::Actor x;
-      self.receive({
+      n.lookup_actor(zaf::Requester{self}, "127.0.0.1:12345", "XActor").on_reply({
         n.on_lookup_actor_reply([&](std::string&, std::string&, zaf::Actor remote_x) {
           x = remote_x;
           self.deactivate();

@@ -237,7 +237,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
         // no other else is asking for the same actor
         this->send_to_net_gate(url, RemoteActorLookupReq, name);
       }
-      requesters.push_back(this->get_current_sender_actor());
+      requesters.push_back(this->take_current_message());
     },
     NetGate::RemoteActorLookupReq - [&](const std::string& name) {
       std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
@@ -256,7 +256,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       auto iter = requesters.find(name);
       Actor actor{RemoteActorHandle{conn.net_sender_info, remote_actor}};
       for (auto& i : iter->second) {
-        this->send(i, ActorLookupRep, peer, name, actor);
+        this->reply(i, ActorLookupRep, peer, name, actor);
       }
       requesters.erase(iter);
     },

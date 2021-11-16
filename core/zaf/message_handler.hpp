@@ -35,16 +35,20 @@ public:
   // then forward the arguments into the handler
   void process(Message& m) override {
     if (m.types_hash_code() != ArgTypes::hash_code()) {
-      throw ZAFException("The hash code of the message content types does not match with the argument types of the message handler.",
+      throw ZAFException("The hash code of the message content types does not"
+        " match with the argument types of the message handler.",
         " Expected: ", ArgTypes::hash_code(),
         " Actual: ", m.types_hash_code());
     }
-    // no `auto` is allowed in the argument type, otherwise we need to match the lambda with arguments in compile time.
+    // no `auto` is allowed in the argument type, otherwise we need to
+    // match the lambda with arguments in compile time.
     if (m.is_serialized()) {
       if constexpr (traits::all_handler_arguments_serializable<ArgTypes>::value) {
-        process(static_cast<SerializedMessage&>(m), std::make_index_sequence<ArgTypes::size>());
+        process(static_cast<SerializedMessage&>(m),
+          std::make_index_sequence<ArgTypes::size>());
       } else {
-        throw ZAFException("The TypedMessageHandler contains non-serializable argument(s) but receives a serialized message.");
+        throw ZAFException("The TypedMessageHandler contains non-serializable"
+          " argument(s) but receives a serialized message.");
       }
     } else {
       process(m, std::make_index_sequence<ArgTypes::size>());
@@ -64,7 +68,8 @@ public:
       );
     } catch (...) {
       std::throw_with_nested(ZAFException(
-        "Exception caught in ", __PRETTY_FUNCTION__, " when handling typed message with code ", m.get_code()
+        "Exception caught in ", __PRETTY_FUNCTION__,
+        " when handling typed message with code ", m.get_code()
       ));
     }
   }
@@ -80,7 +85,8 @@ public:
       );
     } catch (...) {
       std::throw_with_nested(ZAFException(
-        "Exception caught in ", __PRETTY_FUNCTION__, " when handling serialized message with code ", m.get_code()
+        "Exception caught in ", __PRETTY_FUNCTION__,
+        " when handling serialized message with code ", m.get_code()
       ));
     }
   }
