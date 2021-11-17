@@ -40,7 +40,7 @@ public:
 
   virtual SerializedMessage* serialize() const = 0;
 
-  virtual ~Message();
+  virtual ~Message() = default;
 
 private:
   size_t code;

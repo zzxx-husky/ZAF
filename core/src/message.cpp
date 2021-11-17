@@ -17,8 +17,6 @@ Message::Type Message::get_type() const { return type; }
 
 const Actor& Message::get_sender_actor() const { return sender_actor; }
 
-Message::~Message() {}
-
 SerializedMessage::SerializedMessage(const Actor& sender_actor, size_t code):
   Message(sender_actor, code) {
 }

@@ -145,6 +145,11 @@ protected:
   }
 };
 
+template<typename T, typename ... ArgT>
+CountPointer<T> make_count(ArgT&& ... args) {
+  return {std::forward<ArgT>(args) ...};
+}
+
 template<typename T>
 void deserialize(Deserializer& s, CountPointer<T>& ptr) {
   if (s.read<bool>()) {

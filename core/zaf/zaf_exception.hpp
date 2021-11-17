@@ -1,6 +1,7 @@
 #pragma once
 
 #include <exception>
+#include <iostream>
 #include <stdexcept>
 
 #include "to_string.hpp"
@@ -25,4 +26,5 @@ private:
 };
 
 void print_exception(const std::exception& e, int level = 0);
+void print_exception(std::ostream& o, const std::exception& e, int level = 0);
 } // namespace zaf

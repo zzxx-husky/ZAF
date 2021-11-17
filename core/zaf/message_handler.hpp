@@ -11,7 +11,7 @@ namespace zaf {
 // Store the type-erased user-defined message handler
 struct MessageHandler {
   virtual void process(Message&) = 0;
-  virtual ~MessageHandler();
+  virtual ~MessageHandler() = default;
 };
 
 // Store the original user-defined message handler

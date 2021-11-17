@@ -16,13 +16,17 @@ const char* ZAFException::what() const noexcept {
 }
 
 void print_exception(const std::exception& e, int level) {
-  std::cerr << std::string(level, ' ') << "exception: " << e.what() << std::endl;
+  print_exception(std::cerr, e, level);
+}
+
+void print_exception(std::ostream& o, const std::exception& e, int level) {
+  o << std::string(level, ' ') << "exception: " << e.what() << std::endl;
   try {
     std::rethrow_if_nested(e);
   } catch (const std::exception& e) {
-    print_exception(e, level + 1);
+    print_exception(o, e, level + 1);
   } catch (...) {
-    std::cerr << std::string(level + 1, ' ') << "exception: unknown" << std::endl;
+    o << std::string(level + 1, ' ') << "exception: unknown" << std::endl;
   }
 }
 } // namespace zaf
