@@ -96,7 +96,7 @@ private:
 };
 
 template<typename ... ArgT>
-auto make_message(Actor sender, size_t code, ArgT&& ... args) {
+auto make_message(const Actor& sender, size_t code, ArgT&& ... args) {
   auto content = std::make_tuple(std::forward<ArgT>(args)...);
   auto m = new TypedMessage<decltype(content)>(sender, code, std::move(content));
   return m;

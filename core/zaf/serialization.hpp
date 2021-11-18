@@ -171,7 +171,8 @@ inline void deserialize(Deserializer& s, std::string& str) {
 }
 
 // 6. Serialization for std::optional
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<!std::is_reference_v<T>>* = nullptr>
 inline void serialize(Serializer& s, const std::optional<T>& o) {
   bool has_value = o.has_value();
   s.write(has_value);
@@ -180,7 +181,8 @@ inline void serialize(Serializer& s, const std::optional<T>& o) {
   }
 }
 
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<!std::is_reference_v<T>>* = nullptr>
 inline void deserialize(Deserializer& s, std::optional<T>& o) {
   if (s.read<bool>()) {
     o = std::move(s.read<T>());
