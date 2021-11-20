@@ -87,8 +87,8 @@ void ActorBehaviorX::consume_swsr_recv_queues(MessageHandlers& handlers) {
         handlers.process(*m);
       } catch (...) {
         std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", m->get_code(),
-          " (", std::hex, m->get_code(), ")."));
+          "Exception caught when processing a message with code ",
+          m->get_body().get_code(), " (", std::hex, m->get_body().get_code(), ")."));
       }
       if (this->current_message) {
         delete this->current_message;

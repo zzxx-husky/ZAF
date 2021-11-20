@@ -56,7 +56,9 @@ GTEST_TEST(Actor, RemoteActorLocalTransfer) {
   std::thread machine_a([&]() {
     ActorSystem sys;
     NetGate gate{sys, "127.0.0.1", 45678};
-    gate.register_actor("A", sys.spawn([&](ActorBehavior& self) {
+    NetGateClient client{gate.actor()};
+    auto sender = sys.create_scoped_actor();
+    client.register_actor(*sender, "A", sys.spawn([&](ActorBehavior& self) {
       self.receive_once({
         Code{0} - [&]() {
           i++;

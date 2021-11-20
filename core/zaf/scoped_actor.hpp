@@ -27,6 +27,10 @@ public:
     return *this;
   }
 
+  const ActorType* operator->() const {
+    return actor.get();
+  }
+
   ActorType* operator->() {
     return actor.get();
   }

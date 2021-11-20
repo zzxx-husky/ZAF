@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "zaf/actor.hpp"
 #include "zaf/actor_behavior.hpp"
 #include "zaf/message.hpp"
 #include "zaf/message_handler.hpp"
@@ -42,6 +43,9 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_TRUE((traits::all_serializable<std::unordered_map<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<std::unordered_set<int>>::value);
   EXPECT_FALSE((traits::all_serializable<std::array<int, 4>>::value));
+  // Actor
+  EXPECT_TRUE((traits::all_serializable<ActorInfo>::value));
+  EXPECT_FALSE((traits::all_serializable<Actor>::value));
   // a pointer pointing to a local variable
   EXPECT_EQ(traits::all_serializable<int*>::value, traits::all_serializable<int>::value);
   EXPECT_EQ(traits::all_serializable<std::vector<int>*>::value, traits::all_serializable<std::vector<int>>::value);
@@ -105,106 +109,123 @@ GTEST_TEST(SerializedMessage, Basic) {
 GTEST_TEST(SerializedMessage, EmptyMessageContent) {
   int x = 0;
   MessageHandlers handlers = {
-    zaf::Code{0} - [&]() {
+    Code{0} - [&]() {
       x++;
     },
-    zaf::Code{1} - [&]() {
+    Code{1} - [&]() {
       x *= 2;
     }
   };
 
   {
     auto m = make_message(nullptr, 0);
-    auto s = m->serialize();
-    handlers.process(*s);
+    auto s = make_serialized_message(m);
+    handlers.process(s);
     EXPECT_EQ(x, 1);
-    delete s;
-    delete m;
   }
   {
     auto m = make_message(nullptr, 1);
-    auto s = m->serialize();
-    handlers.process(*s);
+    auto s = make_serialized_message(m);
+    handlers.process(s);
     EXPECT_EQ(x, 2);
-    handlers.process(*s);
+    handlers.process(s);
     EXPECT_EQ(x, 4);
-    delete s;
-    delete m;
   }
   {
     auto m = make_message(nullptr, 2);
-    auto s = m->serialize();
-    EXPECT_ANY_THROW(handlers.process(*s));
-    delete s;
-    delete m;
+    auto s = make_serialized_message(m);
+    EXPECT_ANY_THROW(handlers.process(s));
   }
 }
 
 GTEST_TEST(SerializedMessage, HandlersWithArgs) {
   int x = 0;
   MessageHandlers handlers = {
-    zaf::Code{0} - [&](int a) {
+    Code{0} - [&](int a) {
       x += a;
     },
-    zaf::Code{1} - [&](int b) {
+    Code{1} - [&](int b) {
       x *= b;
     }
   };
 
   {
     auto m = make_message(nullptr, 0, 10);
-    auto s = m->serialize();
-    handlers.process(*s);
+    auto s = make_serialized_message(m);
+    handlers.process(s);
     EXPECT_EQ(x, 10);
-    delete s;
-    delete m;
   }
   {
     auto m = make_message(nullptr, 1, 3);
-    auto s = m->serialize();
-    handlers.process(*s);
+    auto s = make_serialized_message(m);
+    handlers.process(s);
     EXPECT_EQ(x, 30);
-    handlers.process(*s);
+    handlers.process(s);
     EXPECT_EQ(x, 90);
-    delete s;
-    delete m;
   }
   {
     auto m = make_message(nullptr, 2);
-    auto s = m->serialize();
-    EXPECT_ANY_THROW(handlers.process(*s));
-    delete s;
-    delete m;
+    auto s = make_serialized_message(m);
+    EXPECT_ANY_THROW(handlers.process(s));
   }
 }
 
 GTEST_TEST(SerializedMessage, HandlersWithObjArgs) {
   MessageHandlers handlers = {
-    zaf::Code{0} - [&](const std::string& a) {
+    Code{0} - [&](const std::string& a) {
       EXPECT_EQ(a.size(), 11);
       EXPECT_EQ(a, "Hello World");
     },
-    zaf::Code{1} - [&](const std::vector<int>& b) {
+    Code{1} - [&](const std::vector<int>& b) {
       EXPECT_EQ(b.size(), 5);
       EXPECT_EQ(b, (std::vector<int>{1,2,3,4,5}));
     },
-    zaf::Code{2} - [&](int* x) {
+    Code{2} - [&](int* x) {
       *x *= 2;
     }
   };
   {
     auto m = make_message(nullptr, 0, std::string("Hello World"));
-    auto s = m->serialize();
-    handlers.process(*s);
-    delete s;
-    delete m;
+    auto s = make_serialized_message(m);
+    handlers.process(s);
   }
   {
     auto m = make_message(nullptr, 1, std::vector<int>{1,2,3,4,5});
-    auto s = m->serialize();
-    handlers.process(*s);
-    delete s;
-    delete m;
+    auto s = make_serialized_message(m);
+    handlers.process(s);
+  }
+}
+
+GTEST_TEST(SerializedMessage, MessageInMessage) {
+  MessageHandlers handlers = {
+    Code{0} - [&](const std::string& a) {
+      EXPECT_EQ(a.size(), 11);
+      EXPECT_EQ(a, "Hello World");
+    },
+    Code{1} - [&](const std::vector<int>& b) {
+      EXPECT_EQ(b.size(), 5);
+      EXPECT_EQ(b, (std::vector<int>{1,2,3,4,5}));
+    },
+    Code{2} - [&](int* x) {
+      *x *= 2;
+    }
+  };
+  MessageHandlers outer_handlers = {
+    Code{100} - [&](std::unique_ptr<MessageBody>& m) {
+      handlers.process(*m);
+    }
+  };
+  {
+    auto m = make_message(nullptr, 100,
+      std::unique_ptr<MessageBody>(new_message(0, std::string("Hello World"))));
+    auto s = make_serialized_message(m);
+    outer_handlers.process(s);
+  }
+  {
+    auto m = make_message(nullptr, 100,
+      std::unique_ptr<MessageBody>(new_message(1, std::vector<int>{1,2,3,4,5})));
+    auto s = make_serialized_message(m);
+    outer_handlers.process(s);
   }
 }
 } // namespace zaf

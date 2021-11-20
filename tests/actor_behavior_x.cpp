@@ -31,7 +31,7 @@ GTEST_TEST(ActorBehaviorX, X2X2X) {
 
   ActorBehaviorX b;
   b.initialize_actor(actor_system, actor_system);
-  Actor xb = b.get_local_actor_handle();
+  Actor xb{b.get_local_actor_handle()};
 
   a.send(xb, 0, std::string("X2X"));
   b.receive({
@@ -57,7 +57,7 @@ GTEST_TEST(ActorBehaviorX, A2X2A) {
 
   ActorBehaviorX b;
   b.initialize_actor(actor_system, actor_system);
-  Actor xb = b.get_local_actor_handle();
+  Actor xb{b.get_local_actor_handle()};
 
   a.send(xb, 0, std::string("A2X"));
   b.receive({
@@ -82,7 +82,7 @@ GTEST_TEST(ActorBehaviorX, X2A2X) {
 
   ActorBehavior b;
   b.initialize_actor(actor_system, actor_system);
-  Actor xb = b.get_local_actor_handle();
+  Actor xb{b.get_local_actor_handle()};
 
   a.send(xb, 0, std::string("A2X"));
   b.receive_once({

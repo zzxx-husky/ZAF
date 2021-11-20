@@ -7,7 +7,6 @@
 #include <variant>
 
 #include "macros.hpp"
-#include "serializer.hpp"
 
 namespace zaf {
 struct LocalActorHandle {
@@ -26,14 +25,6 @@ struct LocalActorHandle {
 
   inline constexpr static size_t SerializationSize = sizeof(ActorIdType) + sizeof(bool);
 };
-
-inline void serialize(Serializer& s, const LocalActorHandle& l) {
-  s.write(l.local_actor_id).write(l.use_swsr_msg_delivery);
-}
-
-inline void deserialize(Deserializer& s, LocalActorHandle& l) {
-  s.read(l.local_actor_id).read(l.use_swsr_msg_delivery);
-}
 
 struct NetSenderInfo {
   // the net sender
@@ -74,14 +65,6 @@ struct ActorInfo {
   std::string net_gate_url;
 };
 
-inline void serialize(Serializer& s, const ActorInfo& a) {
-  s.write(a.net_gate_url).write(a.actor);
-}
-
-inline void deserialize(Deserializer& s, ActorInfo& a) {
-  s.read(a.net_gate_url).read(a.actor);
-}
-
 class Actor {
 public:
   Actor() = default;
@@ -90,8 +73,8 @@ public:
   Actor& operator=(const Actor& other) = default;
   Actor& operator=(Actor&& other) = default;
 
-  Actor(const LocalActorHandle&);
-  Actor(const RemoteActorHandle&);
+  explicit Actor(const LocalActorHandle&);
+  explicit Actor(const RemoteActorHandle&);
   Actor(std::nullptr_t);
   Actor& operator=(std::nullptr_t);
 
@@ -116,11 +99,12 @@ public:
     return std::visit(v, handle);
   }
 
-  operator LocalActorHandle&();
-  operator const LocalActorHandle&() const;
-  operator RemoteActorHandle&();
-  operator const RemoteActorHandle&() const;
+  explicit operator LocalActorHandle&();
+  explicit operator const LocalActorHandle&() const;
+  explicit operator RemoteActorHandle&();
+  explicit operator const RemoteActorHandle&() const;
 
+  ActorInfo to_actor_info(const std::string& local_net_gate_url) const;
   ActorInfo to_actor_info(const Actor& requester) const;
 
   friend std::ostream& operator<<(std::ostream&, const Actor&);

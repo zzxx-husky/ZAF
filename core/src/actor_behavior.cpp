@@ -69,7 +69,7 @@ ActorGroup& ActorBehavior::get_actor_group() {
 }
 
 Actor ActorBehavior::get_self_actor() {
-  return {get_local_actor_handle()};
+  return Actor{get_local_actor_handle()};
 }
 
 CountPointer<Message> ActorBehavior::take_current_message() {
@@ -90,7 +90,7 @@ const Message& ActorBehavior::get_current_message() const {
 
 Actor ActorBehavior::get_current_sender_actor() const {
   return this->current_message
-    ? this->current_message->get_sender_actor()
+    ? this->current_message->get_sender()
     : Actor{};
 }
 
@@ -170,8 +170,8 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
       inner_handlers.process(*m);
     } catch (...) {
       std::throw_with_nested(ZAFException(
-        "Exception caught when processing a message with code ", m->get_code(),
-        " (", std::hex, m->get_code(), ")."));
+        "Exception caught when processing a message with code ", m->get_body().get_code(),
+        " (", std::hex, m->get_body().get_code(), ")."));
     }
     if (this->current_message) {
       delete this->current_message;
@@ -345,12 +345,12 @@ const std::string& ActorBehavior::get_routing_id(ActorIdType id, bool send_or_re
   return routing_id_buffer;
 }
 
-void ActorBehavior::RequestHelper::on_reply(MessageHandlers&& handlers) {
+void ActorBehavior::RequestHandler::on_reply(MessageHandlers&& handlers) {
   this->on_reply(handlers);
 }
 
 // Note: need to store the current status of ActorBehavior and create a new round of `receive`
-void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
+void ActorBehavior::RequestHandler::on_reply(MessageHandlers& handlers) {
   ++self.waiting_for_response;
   auto cur_act = self.is_activated();
   self.receive([&](Message* m) {
@@ -361,8 +361,8 @@ void ActorBehavior::RequestHelper::on_reply(MessageHandlers& handlers) {
         handlers.process(*m);
       } catch (...) {
         std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", m->get_code(),
-          " (", std::hex, m->get_code(), ")."));
+          "Exception caught when processing a message with code ", m->get_body().get_code(),
+          " (", std::hex, m->get_body().get_code(), ")."));
       }
       if (self.current_message) {
         delete self.current_message;
@@ -392,14 +392,14 @@ void ActorBehavior::flush_delayed_messages() {
     auto& msg = delayed_messages.begin()->second;
     std::visit(overloaded{
       [&](Message*& m) {
-        LocalActorHandle& r = msg.receiver;
+        LocalActorHandle& r = static_cast<LocalActorHandle&>(msg.receiver);
         this->send(r, m);
         m = nullptr;
       },
       [&](MessageBytes& m) {
-        RemoteActorHandle& r = msg.receiver;
-        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
-          Message::Type::Normal, std::move(m.header), std::move(m.content));
+        RemoteActorHandle& r = static_cast<RemoteActorHandle&>(msg.receiver);
+        this->send(r.net_sender_info->net_sender, Message::Type::Normal,
+          DefaultCodes::ForwardMessage, std::move(m.header), std::move(m.content));
       }
     }, msg.message);
     delayed_messages.erase(delayed_messages.begin());

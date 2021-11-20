@@ -22,7 +22,9 @@ int main(int argc, char** argv) {
   std::thread machine_a([]() {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 12345};
-    gate.register_actor("XActor", actor_system.spawn<X>());
+    auto sender = actor_system.create_scoped_actor();
+    zaf::NetGateClient client{gate.actor()};
+    client.register_actor(*sender, "XActor", actor_system.spawn<X>());
   });
   std::thread machine_b([]() {
     zaf::ActorSystem actor_system;

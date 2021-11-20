@@ -46,14 +46,16 @@ public:
       try {
         run(*new_actor);
       } catch (const std::exception& e) {
-        std::cerr << "Exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+        std::cerr << "Exception caught when running an actor at "
+          << __PRETTY_FUNCTION__ << std::endl;
         print_exception(e);
       } catch (...) {
-        std::cerr << "Unknown exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+        std::cerr << "Unknown exception caught when running an actor at "
+          << __PRETTY_FUNCTION__ << std::endl;
       }
       delete new_actor;
     }).detach();
-    return {new_actor->get_local_actor_handle()};
+    return Actor{new_actor->get_local_actor_handle()};
   }
 
   zmq::context_t& get_zmq_context();
@@ -61,7 +63,6 @@ public:
   ActorIdType get_next_available_actor_id();
 
   void set_identifier(const std::string&);
-
   const std::string& get_identifier() const;
 
   ~ActorSystem();

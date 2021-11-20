@@ -4,87 +4,180 @@
 #include "zaf/zaf_exception.hpp"
 
 namespace zaf {
-Message::Message(const Actor& sender_actor, size_t code):
-  sender_actor(sender_actor),
+void Message::set_body(MessageBody* body) {
+  this->set_body(std::unique_ptr<MessageBody>(body));
+}
+
+void Message::set_body(std::unique_ptr<MessageBody>&& body) {
+  this->body = std::move(body);
+}
+
+void Message::set_sender(const Actor& sender) {
+  this->sender_actor = sender;
+}
+
+void Message::set_type(Type t) {
+  this->type = t;
+}
+
+MessageBody& Message::get_body() {
+  return *body;
+}
+
+const MessageBody& Message::get_body() const {
+  return *body;
+}
+
+const Actor& Message::get_sender() const {
+  return sender_actor;
+}
+
+Message::Type Message::get_type() const {
+  return this->type;
+}
+
+MessageBody::MessageBody(Code code):
   code(code) {
 }
 
-size_t Message::get_code() const { return code; }
-
-void Message::set_type(Message::Type t) { this->type = t; }
-
-Message::Type Message::get_type() const { return type; }
-
-const Actor& Message::get_sender_actor() const { return sender_actor; }
-
-SerializedMessage::SerializedMessage(const Actor& sender_actor, size_t code):
-  Message(sender_actor, code) {
+size_t MessageBody::get_code() const {
+  return code;
 }
 
-bool SerializedMessage::is_serialized() const {
+MemoryMessageBody::MemoryMessageBody(Code code):
+  MessageBody(code) {
+}
+
+bool MemoryMessageBody::is_serialized() const {
+  return false;
+}
+
+SerializedMessageBody::SerializedMessageBody(Code code):
+  MessageBody(code) {
+}
+
+bool SerializedMessageBody::is_serialized() const {
   return true;
 }
 
-void SerializedMessage::fill_with_element_addrs(std::vector<std::uintptr_t>&) const {
-  throw ZAFException("SerializedMessage cannot provide addresses of the elements in the content.");
-}
-
-TypedSerializedMessage<std::vector<char>>::TypedSerializedMessage(
-  const Actor& sender_actor, size_t code, Type type, size_t types_hash, std::vector<char>&& bytes, size_t offset):
-  SerializedMessage(sender_actor, code),
+TypedSerializedMessageBody<std::vector<char>>::TypedSerializedMessageBody(
+  Code code, size_t types_hash, std::vector<char>&& bytes, size_t offset):
+  SerializedMessageBody(code),
   content_bytes(std::move(bytes)),
   offset(offset),
   types_hash(types_hash) {
-  this->set_type(type);
 }
 
-SerializedMessage* TypedSerializedMessage<std::vector<char>>::serialize() const {
-  return new TypedSerializedMessage<std::vector<char>> {
-    this->get_sender_actor(),
-    this->get_code(),
-    this->get_type(),
-    this->types_hash_code(),
-    std::vector<char>{this->content_bytes}
-  };
-}
-
-Deserializer TypedSerializedMessage<std::vector<char>>::make_deserializer() const {
+Deserializer TypedSerializedMessageBody<std::vector<char>>::make_deserializer() const {
   return {&content_bytes.front() + offset};
 }
 
-size_t TypedSerializedMessage<std::vector<char>>::types_hash_code() const {
+size_t TypedSerializedMessageBody<std::vector<char>>::get_type_hash_code() const {
   return types_hash;
 }
 
-TypedSerializedMessage<zmq::message_t>::TypedSerializedMessage(
-  const Actor& sender_actor, size_t code, Type type, size_t types_hash, zmq::message_t&& bytes, size_t offset):
-  SerializedMessage(sender_actor, code),
-  message_bytes(std::move(bytes)),
+void TypedSerializedMessageBody<std::vector<char>>::serialize(Serializer& s) {
+  s.write(get_code())
+   .write(types_hash)
+   .write(static_cast<unsigned>(content_bytes.size() - offset))
+   .write_bytes(&content_bytes.front() + offset, content_bytes.size() - offset);
+}
+
+void TypedSerializedMessageBody<std::vector<char>>::serialize_content(Serializer& s) {
+  s.write_bytes(&content_bytes.front() + offset, content_bytes.size() - offset);
+}
+
+TypedSerializedMessageBody<zmq::message_t>::TypedSerializedMessageBody(
+  Code code, size_t types_hash, zmq::message_t&& bytes, size_t offset):
+  SerializedMessageBody(code),
+  content_bytes(std::move(bytes)),
   offset(offset),
   types_hash(types_hash) {
-  this->set_type(type);
 }
 
-SerializedMessage* TypedSerializedMessage<zmq::message_t>::serialize() const {
-  return new TypedSerializedMessage<zmq::message_t> {
-    this->get_sender_actor(),
-    this->get_code(),
-    this->get_type(),
-    this->types_hash_code(),
-    zmq::message_t{
-      (char*) this->message_bytes.data() + this->offset,
-      this->message_bytes.size() - this->offset
-    },
-    0
-  };
+Deserializer TypedSerializedMessageBody<zmq::message_t>::make_deserializer() const {
+  return {content_bytes.data<char>() + offset};
 }
 
-Deserializer TypedSerializedMessage<zmq::message_t>::make_deserializer() const {
-  return {(char*) message_bytes.data() + offset};
-}
-
-size_t TypedSerializedMessage<zmq::message_t>::types_hash_code() const {
+size_t TypedSerializedMessageBody<zmq::message_t>::get_type_hash_code() const {
   return types_hash;
 }
 
+void TypedSerializedMessageBody<zmq::message_t>::serialize(Serializer& s) {
+  s.write(get_code())
+   .write(types_hash)
+   .write(static_cast<unsigned>(content_bytes.size() - offset))
+   .write_bytes(content_bytes.data<char>() + offset, content_bytes.size() - offset);
+}
+
+void TypedSerializedMessageBody<zmq::message_t>::serialize_content(Serializer& s) {
+  s.write_bytes(content_bytes.data<char>() + offset, content_bytes.size() - offset);
+}
+
+Message make_serialized_message(Message& m) {
+  Message message;
+  message.set_sender(m.get_sender());
+  message.set_type(m.get_type());
+  auto& body = m.get_body();
+  std::vector<char> bytes;
+  Serializer s{bytes};
+  body.serialize_content(s);
+  message.set_body(new TypedSerializedMessageBody<std::vector<char>>(
+    body.get_code(),
+    body.get_type_hash_code(),
+    std::move(bytes)
+  ));
+  return message;
+}
+
+Message* new_serialized_message(Message& m) {
+  auto message = new Message();
+  message->set_sender(m.get_sender());
+  message->set_type(m.get_type());
+  auto& body = m.get_body();
+  std::vector<char> bytes;
+  Serializer s{bytes};
+  body.serialize_content(s);
+  message->set_body(new TypedSerializedMessageBody<std::vector<char>>(
+    body.get_code(),
+    body.get_type_hash_code(),
+    std::move(bytes)
+  ));
+  return message;
+}
+
+TypedSerializedMessageBody<std::vector<char>>
+make_serialized_message(MessageBody& m) {
+  std::vector<char> bytes;
+  Serializer s{bytes};
+  m.serialize_content(s);
+  return TypedSerializedMessageBody<std::vector<char>>(
+    m.get_code(),
+    m.get_type_hash_code(),
+    std::move(bytes)
+  );
+}
+
+TypedSerializedMessageBody<std::vector<char>>*
+new_serialized_message(MessageBody& m) {
+  std::vector<char> bytes;
+  Serializer s{bytes};
+  m.serialize_content(s);
+  return new TypedSerializedMessageBody<std::vector<char>>(
+    m.get_code(),
+    m.get_type_hash_code(),
+    std::move(bytes)
+  );
+}
+
+void serialize(Serializer& s, MessageBody* body) {
+  s.write(body->get_code())
+   .write(body->get_type_hash_code());
+  auto ptr = s.size();
+  s.write(unsigned(0));
+  body->serialize_content(s);
+  s.move_write_ptr_to(ptr);
+  s.write(static_cast<unsigned>(s.size() - ptr - sizeof(unsigned)));
+  s.move_write_ptr_to_end();
+}
 } // namespace zaf

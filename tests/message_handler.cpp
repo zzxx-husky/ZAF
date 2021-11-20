@@ -19,22 +19,19 @@ GTEST_TEST(MessageHandler, HandlersWithoutArg) {
 
   {
     auto m = make_message(nullptr, 0);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 1);
-    delete m;
   }
   {
     auto m = make_message(nullptr, 1);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 2);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 4);
-    delete m;
   }
   {
     auto m = make_message(nullptr, 2);
-    EXPECT_ANY_THROW(handlers.process(*m));
-    delete m;
+    EXPECT_ANY_THROW(handlers.process(m));
   }
 }
 
@@ -51,22 +48,19 @@ GTEST_TEST(MessageHandler, HandlersWithArgs) {
 
   {
     auto m = make_message(nullptr, 0, 10);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 10);
-    delete m;
   }
   {
     auto m = make_message(nullptr, 1, 3);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 30);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(x, 90);
-    delete m;
   }
   {
     auto m = make_message(nullptr, 2);
-    EXPECT_ANY_THROW(handlers.process(*m));
-    delete m;
+    EXPECT_ANY_THROW(handlers.process(m));
   }
 }
 
@@ -86,20 +80,17 @@ GTEST_TEST(MessageHandler, HandlersWithObjArgs) {
   };
   {
     auto m = make_message(nullptr, 0, std::string("Hello World"));
-    handlers.process(*m);
-    delete m;
+    handlers.process(m);
   }
   {
     auto m = make_message(nullptr, 1, std::vector<int>{1,2,3,4,5});
-    handlers.process(*m);
-    delete m;
+    handlers.process(m);
   }
   {
     int b = 10;
     auto m = make_message(nullptr, 2, &b);
-    handlers.process(*m);
+    handlers.process(m);
     EXPECT_EQ(b, 20);
-    delete m;
   }
 }
 
@@ -108,7 +99,6 @@ GTEST_TEST(MessageHandler, TypeMismatch) {
     zaf::Code{0} - [&](const std::string& x) {}
   };
   auto m = make_message(nullptr, 0, "123");
-  EXPECT_ANY_THROW(handlers.process(*m));
-  delete m;
+  EXPECT_ANY_THROW(handlers.process(m));
 }
 } // namespace zaf

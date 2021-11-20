@@ -1,22 +1,20 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <vector>
 
 #include "callable_signature.hpp"
 #include "traits.hpp"
-#include "zaf_exception.hpp"
 
 namespace zaf {
 class Serializer {
 public:
   Serializer(std::vector<char>& byte_buffer);
 
-  inline void write_bytes(const char* b, size_t n) {
-    bytes.insert(bytes.end(), b, b + n);
-  }
+  void write_bytes(const char* b, size_t n);
 
   template<typename I>
   inline void write_pod(I&& x) {
@@ -28,12 +26,16 @@ public:
   template<typename T, typename ... Ts>
   Serializer& write(T&& t, Ts&& ... ts);
 
-  inline const std::vector<char>& get_underlying_bytes() const {
-    return bytes;
-  }
+  void move_write_ptr_to(size_t ptr);
+  void move_write_ptr_to_end();
+
+  const std::vector<char>& get_underlying_bytes() const;
+
+  size_t size() const;
 
 private:
   std::vector<char>& bytes;
+  size_t wptr;
 };
 
 class Deserializer {
@@ -84,6 +86,47 @@ Deserializer& Deserializer::read(T& t) {
 }
 
 namespace traits {
+template<typename ... ArgT>
+struct NonSerializableAnalyzer;
+
+template<>
+struct NonSerializableAnalyzer<> {
+  static void to_string(std::string&) {}
+  static std::string to_string() { return ""; }
+};
+
+template<typename Arg>
+struct NonSerializableAnalyzer<Arg> {
+  static void to_string(std::string& str) {
+    if constexpr (!traits::is_savable<Arg>::value || !traits::is_loadable<Arg>::value) {
+      if (!str.empty()) {
+        str.append(", ");
+      }
+      str.append(typeid(Arg).name());
+    }
+  }
+
+  static std::string to_string() {
+    std::string s;
+    to_string(s);
+    return s;
+  }
+};
+
+template<typename Arg, typename ... ArgT>
+struct NonSerializableAnalyzer<Arg, ArgT ...> {
+  static void to_string(std::string& str) {
+    NonSerializableAnalyzer<Arg>::to_string(str);
+    NonSerializableAnalyzer<ArgT ...>::to_string(str);
+  }
+
+  static std::string to_string() {
+    std::string s;
+    to_string(s);
+    return s;
+  }
+};
+
 template<typename ... ArgT>
 using all_serializable = std::integral_constant<bool,
   sizeof...(ArgT) == 0 || (std::conjunction_v<traits::is_savable<ArgT> ...> && std::conjunction_v<traits::is_loadable<ArgT>...>)

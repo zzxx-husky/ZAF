@@ -4,19 +4,23 @@
 #include <string>
 #include <type_traits>
 
+#include "actor.hpp"
+#include "count_pointer.hpp"
+#include "zaf_exception.hpp"
+
 namespace zaf {
 // 1. Serialization for POD
 template<typename POD,
   typename RAW = traits::remove_cvref_t<POD>,
-  std::enable_if_t<std::is_pod<RAW>::value>* = nullptr,
-  std::enable_if_t<!std::is_pointer<RAW>::value>* = nullptr>
+  std::enable_if_t<std::is_pod_v<RAW>>* = nullptr,
+  std::enable_if_t<!std::is_pointer_v<RAW>>* = nullptr>
 void serialize(Serializer& s, POD&& pod) {
   s.write_pod(std::forward<POD>(pod));
 }
 
 template<typename POD,
-  std::enable_if_t<std::is_pod<POD>::value>* = nullptr,
-  std::enable_if_t<!std::is_pointer<POD>::value>* = nullptr>
+  std::enable_if_t<std::is_pod_v<POD>>* = nullptr,
+  std::enable_if_t<!std::is_pointer_v<POD>>* = nullptr>
 void deserialize(Deserializer& s, POD& pod) {
   s.read_pod(pod);
 }
@@ -65,7 +69,7 @@ using is_loadable = decltype(impl::is_loadable<traits::remove_cvref_t<T>>(0));
 // a pointer is savable if the value is savable
 template<typename P,
   typename RAW = traits::remove_cvref_t<P>,
-  std::enable_if_t<std::is_pointer<RAW>::value>* = nullptr,
+  std::enable_if_t<std::is_pointer_v<RAW>>* = nullptr,
   typename V = traits::remove_cvref_t<decltype(*std::declval<P>())>,
   std::enable_if_t<traits::is_savable<V>::value>* = nullptr>
 inline void serialize(Serializer& s, P&& pnt) {
@@ -74,7 +78,7 @@ inline void serialize(Serializer& s, P&& pnt) {
 
 // a pointer is loadable if the value is loadable
 template<typename P,
-  std::enable_if_t<std::is_pointer<P>::value>* = nullptr,
+  std::enable_if_t<std::is_pointer_v<P>>* = nullptr,
   typename V = traits::remove_cvref_t<decltype(*std::declval<P>())>,
   std::enable_if_t<traits::is_loadable<V>::value>* = nullptr>
 void deserialize(Deserializer& s, P& pnt) {
@@ -82,8 +86,8 @@ void deserialize(Deserializer& s, P& pnt) {
 }
 
 template<typename T,
-  std::enable_if_t<std::is_default_constructible<T>::value>* = nullptr,
-  std::enable_if_t<!std::is_pointer<T>::value>* = nullptr,
+  std::enable_if_t<std::is_default_constructible_v<T>>* = nullptr,
+  std::enable_if_t<!std::is_pointer_v<T>>* = nullptr,
   std::enable_if_t<traits::is_inplace_loadable<T>::value>* = nullptr>
 T deserialize(Deserializer& s) {
   T t{};
@@ -92,10 +96,10 @@ T deserialize(Deserializer& s) {
 }
 
 template<typename T,
-  std::enable_if_t<std::is_pointer<T>::value>* = nullptr,
+  std::enable_if_t<std::is_pointer_v<T>>* = nullptr,
   // remove reference in the value type
   typename V = traits::remove_cvref_t<decltype(*std::declval<T>())>,
-  std::enable_if_t<std::is_default_constructible<V>::value>* = nullptr,
+  std::enable_if_t<std::is_default_constructible_v<V>>* = nullptr,
   std::enable_if_t<traits::is_inplace_loadable<V>::value>* = nullptr>
 T deserialize(Deserializer& s) {
   T t = new V{};
@@ -188,4 +192,47 @@ inline void deserialize(Deserializer& s, std::optional<T>& o) {
     o = std::move(s.read<T>());
   }
 }
+
+template<typename T>
+void deserialize(Deserializer& s, CountPointer<T>& ptr) {
+  if (s.read<bool>()) {
+    auto ptr = s.read<T*>();
+    ptr = CountPointer<T>(ptr);
+  } else {
+    ptr = nullptr;
+  }
+}
+
+template<typename T>
+void serialize(Serializer& s, const CountPointer<T>& ptr) {
+  if (bool(ptr)) {
+    s.write(true).write(ptr.get());
+  } else {
+    s.write(false);
+  }
+}
+
+template<typename T>
+void deserialize(Deserializer& s, std::unique_ptr<T>& ptr) {
+  if (s.read<bool>()) {
+    ptr = std::unique_ptr<T>(s.read<T*>());
+  } else {
+    ptr = nullptr;
+  }
+}
+
+template<typename T>
+void serialize(Serializer& s, const std::unique_ptr<T>& ptr) {
+  if (bool(ptr)) {
+    s.write(true).write(ptr.get());
+  } else {
+    s.write(false);
+  }
+}
+
+void serialize(Serializer& s, const LocalActorHandle& l);
+void deserialize(Deserializer& s, LocalActorHandle& l);
+
+void serialize(Serializer& s, const ActorInfo& a);
+void deserialize(Deserializer& s, ActorInfo& a);
 } // namespace zaf

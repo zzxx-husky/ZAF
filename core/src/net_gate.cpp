@@ -31,30 +31,32 @@ void NetGate::Receiver::receive_once_from_net() {
       __PRETTY_FUNCTION__
     );
   }
-  unsigned num_messages = *static_cast<unsigned*>(message.data());
+  unsigned num_messages = *message.data<unsigned>();
   if (!net_recv_socket.recv(message)) {
     throw ZAFException(
       "Failed to receive message (message bytes) as expected at ",
       __PRETTY_FUNCTION__
     );
   }
-  Deserializer s(static_cast<const char*>(message.data()));
+  Deserializer s(message.data<char>());
   for (unsigned i = 0; i < num_messages; i++) {
     auto send_actor = deserialize<LocalActorHandle>(s);
     auto recv_actor = deserialize<LocalActorHandle>(s);
-    auto message_code = deserialize<size_t>(s);
     auto message_type = deserialize<Message::Type>(s);
+    auto message_code = deserialize<Code>(s);
     auto types_hash = deserialize<size_t>(s);
     auto num_bytes = deserialize<unsigned>(s);
     auto bytes = std::vector<char>(num_bytes);
     s.read_bytes(&bytes.front(), num_bytes);
-    this->send(recv_actor, new TypedSerializedMessage<std::vector<char>>(
-      Actor{RemoteActorHandle{net_sender_info, send_actor}},
+    auto message = new Message();
+    message->set_sender(Actor{RemoteActorHandle{net_sender_info, send_actor}});
+    message->set_type(message_type);
+    message->set_body(std::make_unique<TypedSerializedMessageBody<std::vector<char>>>(
       message_code,
-      message_type,
       types_hash,
       std::move(bytes)
     ));
+    this->send(recv_actor, message);
   }
 }
 
@@ -184,7 +186,8 @@ void NetGate::Sender::terminate_send_socket() {
 
 NetGate::NetGateActor::NetGateActor(const std::string& host, int port):
   bind_host(host),
-  bind_port(port) {
+  bind_port(port),
+  bind_url(to_string(bind_host, ':', bind_port)) {
 }
 
 MessageHandlers NetGate::NetGateActor::behavior() {
@@ -200,7 +203,10 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       this->reply(NetGateBindPortRep, bind_port);
     },
     NetGate::DataConnReq - [&](const std::string& connect_host, int connect_port) {
-      std::string net_gate_url{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
+      std::string net_gate_url{
+        current_net_gate_routing_id.data<char>(),
+        current_net_gate_routing_id.size() - 2
+      };
       auto& s = [&]() -> auto& {
         try {
           return net_gate_connections.at(net_gate_url).sender;
@@ -240,7 +246,10 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       requesters.push_back(this->take_current_message());
     },
     NetGate::RemoteActorLookupReq - [&](const std::string& name) {
-      std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
+      std::string peer{
+        current_net_gate_routing_id.data<char>(),
+        current_net_gate_routing_id.size() - 2
+      };
       auto& local_actor = local_registered_actors[name];
       if (local_actor.actor) {
         this->send_to_net_gate(peer,
@@ -250,7 +259,10 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       }
     },
     NetGate::RemoteActorLookupRep - [&](const std::string& name, const LocalActorHandle& remote_actor) {
-      std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
+      std::string peer{
+        current_net_gate_routing_id.data<char>(),
+        current_net_gate_routing_id.size() - 2
+      };
       auto& conn = net_gate_connections.at(peer);
       auto& requesters = conn.actor_lookup_requesters;
       auto iter = requesters.find(name);
@@ -261,12 +273,18 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       requesters.erase(iter);
     },
     NetGate::Ping - [&]() {
-      std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
+      std::string peer{
+        current_net_gate_routing_id.data<char>(),
+        current_net_gate_routing_id.size() - 2
+      };
       this->establish_connection(peer);
       this->imme_send_to_net_gate(peer, NetGate::Pong);
     },
     NetGate::Pong - [&]() {
-      std::string peer{(char*) current_net_gate_routing_id.data(), current_net_gate_routing_id.size() - 2};
+      std::string peer{
+        current_net_gate_routing_id.data<char>(),
+        current_net_gate_routing_id.size() - 2
+      };
       this->receive_pong(peer);
     },
     NetGate::PingRetry - [&](const std::string& url) {
@@ -281,7 +299,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       this->deactivate();
     },
     NetGate::RetrieveActorReq - [&](ActorInfo& info) {
-      if (info.net_gate_url.empty()) {
+      if (info.net_gate_url == bind_url) {
         this->reply(NetGate::RetrieveActorRep,
           std::move(info), Actor{info.actor});
       } else {
@@ -305,18 +323,19 @@ void NetGate::NetGateActor::receive_once_from_net_gate(MessageHandlers& handlers
   if (!net_recv_socket.recv(msg_bytes, zmq::recv_flags::none)) {
     throw ZAFException("Receive empty message from ", current_net_gate_routing_id);
   }
-  Deserializer s((const char*) msg_bytes.data());
+  Deserializer s(msg_bytes.data<char>());
   auto msg_code = deserialize<size_t>(s);
   // not reading msg_type here because it only receives Message::Type::Normal messages
   auto types_hash = deserialize<size_t>(s);
-  TypedSerializedMessage<zmq::message_t> message {
-    Actor{},
+  Message message;
+  message.set_sender(Actor{});
+  message.set_type(Message::Type::Normal);
+  message.set_body(std::make_unique<TypedSerializedMessageBody<zmq::message_t>>(
     msg_code,
-    Message::Type::Normal,
     types_hash,
     std::move(msg_bytes),
     sizeof(size_t) + sizeof(size_t)
-  };
+  ));
   handlers.process(message);
 }
 
@@ -356,9 +375,7 @@ bool NetGate::NetGateActor::establish_connection(const std::string& url) {
   conn.sender = actor_sys.spawn<Sender>();
   actor_sys.inc_num_detached_actors();
   conn.net_sender_info = NetSenderInfo {
-    conn.sender,
-    to_string(bind_host, ':', bind_port),
-    url
+    static_cast<LocalActorHandle&>(conn.sender), bind_url, url
   };
   conn.receiver = actor_sys.spawn<Receiver>(bind_host, conn.net_sender_info);
   actor_sys.inc_num_detached_actors();
@@ -447,44 +464,27 @@ NetGate::NetGate(ActorSystem& actor_sys, const std::string& bind_host, int port)
   initialize(actor_sys, bind_host, port);
 }
 
-void NetGate::connect(const std::string& host, int port) {
-  if (!is_initialized()) {
-    throw ZAFException("NetGate is used before being initialized.");
-  }
-  self->send(net_gate_actor, NetGate::NetGateConnReq, host, port);
-}
-
 void NetGate::initialize(ActorSystem& actor_sys, const std::string& bind_host, int bind_port) {
-  if (is_initialized()) {
+  if (this->actor_sys) {
     throw ZAFException("Attempt to initialize an already initialized NetGate");
   }
-  self = std::move(actor_sys.create_scoped_actor());
-  // host and port are stored inside NetGateActor because the NetGate object may be destroyed before NetGateActor
+  this->actor_sys = &actor_sys;
+  // host and port are stored inside NetGateActor
+  // because the NetGate object may be destroyed before NetGateActor
   net_gate_actor = actor_sys.spawn<NetGateActor>(bind_host, bind_port);
 }
 
 void NetGate::terminate() {
-  if (!is_initialized()) {
+  if (!this->actor_sys) {
     return;
   }
-  this->self->send(net_gate_actor, NetGate::Termination);
+  auto sender = this->actor_sys->create_scoped_actor();
+  sender->send(net_gate_actor, NetGate::Termination);
   this->net_gate_actor = nullptr;
-  this->self = nullptr;
 }
 
-bool NetGate::is_initialized() const {
-  return this->self;
-}
-
-void NetGate::register_actor(const std::string& name, const Actor& actor) {
-  if (!is_initialized()) {
-    throw ZAFException("NetGate is used before being initialized.");
-  }
-  self->send(net_gate_actor, NetGate::ActorRegistration, name, actor);
-}
-
-Actor NetGate::actor() const {
-  if (!is_initialized()) {
+const Actor& NetGate::actor() const {
+  if (!this->actor_sys) {
     throw ZAFException("NetGate is used before being initialized.");
   }
   return net_gate_actor;

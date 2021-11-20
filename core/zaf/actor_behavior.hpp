@@ -46,21 +46,21 @@ public:
 
     template<typename ... ArgT>
     static MessageBytes make(const LocalActorHandle& send, const LocalActorHandle& recv,
-      size_t code, Message::Type type, ArgT&& ... args) {
+      Message::Type type, Code code, ArgT&& ... args) {
       MessageBytes bytes;
       bytes.header.reserve(
         LocalActorHandle::SerializationSize +
         LocalActorHandle::SerializationSize +
-        sizeof(code) +
         sizeof(type) +
+        sizeof(code) +
         sizeof(size_t) +
         sizeof(unsigned)
       );
       Serializer(bytes.header)
         .write(send)
         .write(recv)
-        .write(code)
         .write(type)
+        .write(code)
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...));
       Serializer(bytes.content)
         .write(std::forward<ArgT>(args) ...);
@@ -98,54 +98,55 @@ public:
 
   // send a normal message to message sender
   template<typename ... ArgT>
-  inline void reply(size_t code, ArgT&& ... args) {
+  inline void reply(Code code, ArgT&& ... args) {
     auto type = this->get_current_message().get_type() == Message::Type::Request
       ? Message::Type::Response
       : Message::Type::Normal;
-    this->send(this->get_current_message().get_sender_actor(),
-      code, type, std::forward<ArgT>(args)...);
+    this->send(this->get_current_message().get_sender(),
+      type, code, std::forward<ArgT>(args)...);
   }
 
   // reply a message to the sender of the `msg`
   template<typename ... ArgT>
-  inline void reply(Message& msg, size_t code, ArgT&& ... args) {
+  inline void reply(Message& msg, Code code, ArgT&& ... args) {
     auto type = msg.get_type() == Message::Type::Request
       ? Message::Type::Response
       : Message::Type::Normal;
-    this->send(msg.get_sender_actor(), code, type, std::forward<ArgT>(args) ...);
+    this->send(msg.get_sender(), type, code, std::forward<ArgT>(args) ...);
   }
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
-  inline void send(ActorBehavior& receiver, size_t code, ArgT&& ... args) {
+  inline void send(ActorBehavior& receiver, Code code, ArgT&& ... args) {
     this->send(receiver.get_local_actor_handle(),
-      code, Message::Type::Normal, std::forward<ArgT>(args)...);
+      Message::Type::Normal, code, std::forward<ArgT>(args)...);
   }
 
   template<typename ... ArgT>
-  inline void send(ActorBehavior& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    this->send(receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args)...);
+  inline void send(ActorBehavior& receiver, Message::Type type, Code code, ArgT&& ... args) {
+    this->send(receiver.get_local_actor_handle(), type, code, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor
   template<typename ... ArgT>
-  inline void send(const Actor& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  inline void send(const Actor& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  void send(const Actor& receiver, size_t code, Message::Type type, ArgT&& ... args);
+  void send(const Actor& receiver, Message::Type type, Code code, ArgT&& ... args);
 
   // send a message to LocalActorHandle
   template<typename ... ArgT>
-  inline void send(const LocalActorHandle& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  void send(const LocalActorHandle& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  inline void send(const LocalActorHandle& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
-    m->set_type(type);
+  void send(const LocalActorHandle& receiver, Message::Type type,
+    Code code, ArgT&& ... args) {
+    auto m = new_message(Actor{this->get_local_actor_handle()}, type,
+      code, std::forward<ArgT>(args)...);
     this->send(receiver, m);
   }
 
@@ -185,35 +186,36 @@ public:
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
-    size_t code, ArgT&& ... args) {
-    this->delayed_send(delay, receiver.get_local_actor_handle(), code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+    Code code, ArgT&& ... args) {
+    this->delayed_send(delay, Actor{receiver.get_local_actor_handle()},
+      Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
-    size_t code, Message::Type type, ArgT&& ... args) {
-    this->delayed_send(delay, receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args) ...);
+    Message::Type type, Code code, ArgT&& ... args) {
+    this->delayed_send(delay, receiver.get_local_actor_handle(), type, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
-    size_t code, ArgT&& ... args) {
-    this->delayed_send(delay, receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+    Code code, ArgT&& ... args) {
+    this->delayed_send(delay, receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
-    size_t code, Message::Type type, ArgT&& ... args);
+    Message::Type type, Code code, ArgT&& ... args);
 
-  struct RequestHelper {
+  struct RequestHandler {
     ActorBehavior& self;
     void on_reply(MessageHandlers&& handlers);
     void on_reply(MessageHandlers& handlers);
   };
 
   template<typename Receiver, typename ... ArgT>
-  inline RequestHelper request(Receiver&& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Request,
+  inline RequestHandler request(Receiver&& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Request, code,
       std::forward<ArgT>(args) ...);
     return {*this};
   }

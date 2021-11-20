@@ -9,14 +9,16 @@ Actor ActorSystem::spawn(ActorBehavior* new_actor) {
     try {
       new_actor->launch();
     } catch (const std::exception& e) {
-      std::cerr << "Exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+      std::cerr << "Exception caught when running an actor at "
+        << __PRETTY_FUNCTION__ << std::endl;
       print_exception(e);
     } catch (...) {
-      std::cerr << "Unknown exception caught when running an actor at " << __PRETTY_FUNCTION__ << std::endl;
+      std::cerr << "Unknown exception caught when running an actor at "
+        << __PRETTY_FUNCTION__ << std::endl;
     }
     delete new_actor;
   }).detach();
-  return {new_actor->get_local_actor_handle()};
+  return Actor{new_actor->get_local_actor_handle()};
 }
 
 void ActorSystem::init_scoped_actor(ActorBehavior& new_actor) {
@@ -38,7 +40,8 @@ ActorSystem::~ActorSystem() {
 
 void ActorSystem::set_identifier(const std::string& identifier) {
   if (num_alive_actors.load(std::memory_order_relaxed) == 0) {
-    throw ZAFException("ActorSystem's identifier cannot be updated if there is any alive actor.");
+    throw ZAFException("Actor system's identifier cannot be updated "
+      "if there is any alive actor.");
   }
   this->identifier = identifier;
 }

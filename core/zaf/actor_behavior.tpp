@@ -1,23 +1,24 @@
 namespace zaf {
 template<typename ... ArgT>
-void ActorBehavior::send(const Actor& receiver, size_t code, Message::Type type, ArgT&& ... args) {
+void ActorBehavior::send(const Actor& receiver, Message::Type type, Code code, ArgT&& ... args) {
   if (!receiver) {
     return; // ignore message sent to null actor
   }
   receiver.visit(overloaded {
     [&](const LocalActorHandle& r) {
-      auto message = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
-      message->set_type(type);
+      auto message = new_message(Actor{this->get_local_actor_handle()}, type,
+        code, std::forward<ArgT>(args)...);
       this->send(r, message);
     },
     [&](const RemoteActorHandle& r) {
       if constexpr (traits::all_serializable<ArgT ...>::value) {
         auto bytes = MessageBytes::make(this->get_local_actor_handle(),
-          r.remote_actor, code, type, std::forward<ArgT>(args) ...);
-        this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
-          Message::Type::Normal, std::move(bytes));
+          r.remote_actor, type, code, std::forward<ArgT>(args) ...);
+        this->send(r.net_sender_info->net_sender, Message::Type::Normal,
+          DefaultCodes::ForwardMessage, std::move(bytes));
       } else {
-        throw ZAFException("Attempt to serialize non-serializable message data.");
+        throw ZAFException("Attempt to serialize non-serializable message data: ",
+          traits::NonSerializableAnalyzer<ArgT ...>::to_string());
       }
     }
   });
@@ -116,8 +117,8 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
 }
 
 template<typename Rep, typename Period, typename ... ArgT>
-void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
-  size_t code, Message::Type type, ArgT&& ... args) {
+void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay,
+  const Actor& receiver, Message::Type type, Code code, ArgT&& ... args) {
   if (!receiver) {
     return;
   }
@@ -125,8 +126,8 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
   auto send_time = now + delay;
   receiver.visit(overloaded{
     [&](const LocalActorHandle& r) {
-      auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
-      m->set_type(type);
+      auto m = new_message(Actor{this->get_local_actor_handle()}, type,
+        code, std::forward<ArgT>(args)...);
       delayed_messages.emplace(send_time, DelayedMessage(receiver, m));
     },
     [&](const RemoteActorHandle& r) {
@@ -134,10 +135,11 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
         delayed_messages.emplace(send_time, DelayedMessage(
           receiver,
           MessageBytes::make(this->get_local_actor_handle(),
-            r.remote_actor, code, type, std::forward<ArgT>(args) ...)
+            r.remote_actor, type, code, std::forward<ArgT>(args) ...)
         ));
       } else {
-        throw ZAFException("Attempt to serialize non-serializable data");
+        throw ZAFException("Attempt to serialize non-serializable data: ",
+          traits::NonSerializableAnalyzer<ArgT ...>::to_string());
       }
     }
   });

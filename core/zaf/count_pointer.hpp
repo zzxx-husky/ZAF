@@ -3,8 +3,6 @@
 #include <functional>
 #include <utility>
 
-#include "serializer.hpp"
-
 namespace zaf {
 // CountPointer is designed to be used within a single thread only.
 // It uses unsigned as the counter type which is not thread-safe.
@@ -78,6 +76,14 @@ public:
     return *this;
   }
 
+  T* get() {
+    return value;
+  }
+
+  const T* get() const {
+    return value;
+  }
+
   T& operator*() {
     return *value;
   }
@@ -148,24 +154,5 @@ protected:
 template<typename T, typename ... ArgT>
 CountPointer<T> make_count(ArgT&& ... args) {
   return {std::forward<ArgT>(args) ...};
-}
-
-template<typename T>
-void deserialize(Deserializer& s, CountPointer<T>& ptr) {
-  if (s.read<bool>()) {
-    ptr = new T();
-    s.read(*ptr);
-  } else {
-    ptr = nullptr;
-  }
-}
-
-template<typename T>
-void serialize(Serializer& s, const CountPointer<T>& ptr) {
-  if (bool(ptr)) {
-    s.write(true).write(*ptr);
-  } else {
-    s.write(false);
-  }
 }
 } // namespace zaf 

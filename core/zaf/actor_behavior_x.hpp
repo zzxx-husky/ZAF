@@ -19,62 +19,63 @@ public:
 
   // send a normal message to message sender
   template<typename ... ArgT>
-  inline void reply(size_t code, ArgT&& ... args) {
+  inline void reply(Code code, ArgT&& ... args) {
     if (this->get_current_message().get_type() == Message::Type::Request) {
       this->ActorBehavior::reply(code, std::forward<ArgT>(args) ...);
     } else {
       this->send(this->get_current_sender_actor(),
-        code, Message::Type::Normal, std::forward<ArgT>(args)...);
+        Message::Type::Normal, code, std::forward<ArgT>(args)...);
     }
   }
 
   // reply a message to the sender of the `msg`
   template<typename ... ArgT>
-  inline void reply(Message& msg, size_t code, ArgT&& ... args) {
+  inline void reply(Message& msg, Code code, ArgT&& ... args) {
     if (msg.get_type() == Message::Type::Request) {
       this->ActorBehavior::reply(msg, code, std::forward<ArgT>(args) ...);
     } else {
-      this->send(msg.get_sender_actor(),
-        code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+      this->send(msg.get_sender(), Message::Type::Normal, 
+        code, std::forward<ArgT>(args) ...);
     }
   }
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
-  inline void send(const ActorBehavior& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  inline void send(const ActorBehavior& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  inline void send(const ActorBehavior& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    this->send(receiver.get_local_actor_handle(), code, type, std::forward<ArgT>(args)...);
+  inline void send(const ActorBehavior& receiver, Message::Type type, Code code, ArgT&& ... args) {
+    this->send(receiver.get_local_actor_handle(), type, code, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor, either remote or local
   template<typename ... ArgT>
-  inline void send(const Actor& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  inline void send(const Actor& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  void send(const Actor& receiver, size_t code, Message::Type type, ArgT&& ... args) {
+  void send(const Actor& receiver, Message::Type type, Code code, ArgT&& ... args) {
     if (!receiver) {
       return;
     }
     receiver.visit(overloaded {
       [&](const LocalActorHandle& r) {
-        auto message = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
-        message->set_type(type);
+        auto message = new_message(Actor{this->get_local_actor_handle()}, type,
+          code, std::forward<ArgT>(args)...);
         this->send(r, message);
       },
       [&](const RemoteActorHandle& r) {
         if constexpr (traits::all_serializable<ArgT ...>::value) {
           auto bytes = MessageBytes::make(this->get_local_actor_handle(),
-            r.remote_actor, code, type, std::forward<ArgT>(args) ...);
-          this->send(r.net_sender_info->net_sender, DefaultCodes::ForwardMessage,
-            Message::Type::Normal, std::move(bytes));
+            r.remote_actor, type, code, std::forward<ArgT>(args) ...);
+          this->send(r.net_sender_info->net_sender, Message::Type::Normal,
+            DefaultCodes::ForwardMessage, std::move(bytes));
         } else {
-          throw ZAFException("Attempt to serialize non-serializable message data.");
+          throw ZAFException("Attempt to serialize non-serializable message data: ",
+            traits::NonSerializableAnalyzer<ArgT ...>::to_string());
         }
       }
     });
@@ -82,14 +83,14 @@ public:
 
   // send a message to LocalActorHandle
   template<typename ... ArgT>
-  inline void send(const LocalActorHandle& receiver, size_t code, ArgT&& ... args) {
-    this->send(receiver, code, Message::Type::Normal, std::forward<ArgT>(args) ...);
+  inline void send(const LocalActorHandle& receiver, Code code, ArgT&& ... args) {
+    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
   }
 
   template<typename ... ArgT>
-  inline void send(const LocalActorHandle& receiver, size_t code, Message::Type type, ArgT&& ... args) {
-    auto m = make_message(this->get_local_actor_handle(), code, std::forward<ArgT>(args)...);
-    m->set_type(type);
+  inline void send(const LocalActorHandle& receiver, Message::Type type, Code code, ArgT&& ... args) {
+    auto m = new_message(Actor{this->get_local_actor_handle()}, type,
+      code, std::forward<ArgT>(args)...);
     this->send(receiver, m);
   }
 

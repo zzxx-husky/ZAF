@@ -24,7 +24,6 @@ struct NetGateClient {
     return self.send(net_gate_actor, NetGate::ActorLookupReq, url, name);
   }
 
-  // 1. lookup actor, reply 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
     typename std::enable_if_t<Sig::value>* = nullptr,
@@ -64,6 +63,17 @@ struct NetGateClient {
     return NetGate::RetrieveActorRep - std::forward<Handler>(handler);
   }
 
+  template<typename Handler,
+    typename Sig = traits::is_callable<Handler>,
+    typename std::enable_if_t<Sig::value>* = nullptr,
+    typename std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
+  inline auto on_retrieve_actor_reply(Handler&& handler) const {
+    return NetGate::RetrieveActorRep -
+      [h = std::forward<Handler>(handler)](ActorInfo&, Actor& a) {
+        h(a);
+      };
+  }
+
   // 4. Query the port NetGate binds on
   template<typename ActorLike>
   inline decltype(auto) request_bind_port(ActorLike&& self) const {
@@ -76,6 +86,24 @@ struct NetGateClient {
     typename std::enable_if_t<std::is_invocable_v<Handler, int>>* = nullptr>
   inline auto on_bind_port_reply(Handler&& handler) const {
     return NetGate::NetGateBindPortRep - std::forward<Handler>(handler);
+  }
+
+  // 5. Connect this net gate to another net gate
+  template<typename ActorLike>
+  inline void connect_to_net_gate(ActorLike&& self, const std::string& host, int port) {
+    self.send(net_gate_actor, NetGate::NetGateConnReq, host, port);
+  }
+
+  // 6. Register actor
+  template<typename ActorLike>
+  inline void register_actor(ActorLike&& self, const std::string& name, const Actor& actor) {
+    self.send(net_gate_actor, NetGate::ActorRegistration, name, actor);
+  }
+
+  // 7. Terminate this net gate
+  template<typename ActorLike>
+  inline void terminate(ActorLike&& self) {
+    self.send(net_gate_actor, NetGate::Termination);
   }
 };
 

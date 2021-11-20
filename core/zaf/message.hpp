@@ -6,13 +6,37 @@
 #include <vector>
 
 #include "actor.hpp"
+#include "code.hpp"
 #include "serializer.hpp"
 #include "zaf_exception.hpp"
 
 #include "zmq.hpp"
 
 namespace zaf {
-class SerializedMessage;
+class MessageBody {
+public:
+  MessageBody(Code code);
+
+  // the code of the message body
+  size_t get_code() const;
+
+  // the combination of the hash code of the content
+  virtual size_t get_type_hash_code() const = 0;
+
+  // whether this message is serialized
+  virtual bool is_serialized() const = 0;
+
+  // serialize this message body, including code, type hash and content
+  virtual void serialize(Serializer& s) = 0;
+
+  // only serialize the message content
+  virtual void serialize_content(Serializer& s) = 0;
+
+  virtual ~MessageBody() = default;
+
+private:
+  Code code;
+};
 
 class Message {
 public:
@@ -22,110 +46,130 @@ public:
     Response = 2,
   };
 
-  Message(const Actor& sender_actor, size_t code);
+  Message() = default;
+  Message(const Message&) = delete;
+  Message& operator=(const Message&) = delete;
+  Message(Message&&) = default;
+  Message& operator=(Message&&) = default;
 
-  size_t get_code() const;
+  void set_body(MessageBody* body);
+  void set_body(std::unique_ptr<MessageBody>&& body);
+  void set_sender(const Actor& sender);
+  void set_type(Type t);
 
-  const Actor& get_sender_actor() const;
-
-  void set_type(Type);
-
+  MessageBody& get_body();
+  const MessageBody& get_body() const;
+  const Actor& get_sender() const;
   Type get_type() const;
 
-  virtual size_t types_hash_code() const = 0;
-
-  virtual bool is_serialized() const = 0;
-
-  virtual void fill_with_element_addrs(std::vector<std::uintptr_t>& addrs) const = 0;
-
-  virtual SerializedMessage* serialize() const = 0;
-
-  virtual ~Message() = default;
-
 private:
-  size_t code;
   Type type = Normal;
-  Actor sender_actor;
+  Actor sender_actor = nullptr;
+  std::unique_ptr<MessageBody> body = nullptr;
 };
 
-template<typename MessageContent>
-struct TypedMessage : public Message {
-  TypedMessage(const Actor& sender_actor, size_t code, MessageContent&& content):
-    Message(sender_actor, code),
+class MemoryMessageBody : public MessageBody {
+public:
+  MemoryMessageBody(Code code);
+
+  bool is_serialized() const override;
+
+  virtual void get_element_ptrs(std::vector<std::uintptr_t>& addrs) const = 0;
+};
+
+template<typename ContentTuple>
+class TypedMessageBody : public MemoryMessageBody {
+public:
+  TypedMessageBody(Code code, ContentTuple&& content):
+    MemoryMessageBody(code),
     content(std::move(content)) {
   }
 
-  bool is_serialized() const override {
-    return false;
+  template<typename>
+  struct TypesHashCode;
+
+  template<typename ... ArgT>
+  struct TypesHashCode<std::tuple<ArgT ...>> {
+    inline const static size_t value = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
+  };
+
+  size_t get_type_hash_code() const override {
+    return TypesHashCode<ContentTuple>::value;
+  }
+
+  void get_element_ptrs(std::vector<std::uintptr_t>& addrs) const override {
+    get_ptrs<0, std::tuple_size<ContentTuple>::value>(addrs);
   }
 
   template<typename>
-  struct Types;
+  struct NonSerializableTypes;
 
   template<typename ... ArgT>
-  struct Types<std::tuple<ArgT ...>> {
-    inline const static size_t hash_code = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
+  struct NonSerializableTypes<std::tuple<ArgT ...>> {
+    static std::string to_string() {
+      return traits::NonSerializableAnalyzer<ArgT ...>::to_string();
+    }
   };
 
-  size_t types_hash_code() const override {
-    return Types<MessageContent>::hash_code;
+  void serialize(Serializer& s) override {
+    s.write(get_code())
+     .write(get_type_hash_code());
+    auto ptr = s.size();
+    s.write(unsigned{0});
+    if constexpr (traits::all_message_content_serializable<ContentTuple>::value) {
+      serialize_content(s, std::make_index_sequence<std::tuple_size<ContentTuple>::value>{});
+      s.move_write_ptr_to(ptr);
+      s.write(static_cast<unsigned>(s.size() - ptr - sizeof(unsigned)));
+      s.move_write_ptr_to_end();
+    } else {
+      throw ZAFException(__PRETTY_FUNCTION__, ": The TypedMessageBody "
+        "contains non-serializable element(s): ",
+        NonSerializableTypes<ContentTuple>::to_string());
+    }
   }
 
-  SerializedMessage* serialize() const override;
-
-  void fill_with_element_addrs(std::vector<std::uintptr_t>& addrs) const override {
-    fill_addrs<0, std::tuple_size<MessageContent>::value>(addrs);
+  void serialize_content(Serializer& s) override {
+    if constexpr (traits::all_message_content_serializable<ContentTuple>::value) {
+      serialize_content(s,
+        std::make_index_sequence<std::tuple_size<ContentTuple>::value>{});
+    } else {
+      throw ZAFException(__PRETTY_FUNCTION__, ": The TypedMessageBody "
+        "contains non-serializable element(s): ",
+        NonSerializableTypes<ContentTuple>::to_string());
+    }
   }
 
 private:
   template<size_t ... i>
-  inline void serialize_elems(Serializer& s, std::index_sequence<i ...>) const {
+  inline void serialize_content(Serializer& s, std::index_sequence<i ...>) const {
     s.write(std::get<i>(content) ...);
   }
 
   template<size_t i, size_t n>
-  void fill_addrs(std::vector<std::uintptr_t>& addrs) const {
+  void get_ptrs(std::vector<std::uintptr_t>& addrs) const {
     if constexpr (i < n) {
       addrs[i] = reinterpret_cast<std::uintptr_t>(&std::get<i>(content));
-      fill_addrs<i + 1, n>(addrs);
+      get_ptrs<i + 1, n>(addrs);
     }
   }
 
   // a std::tuple that contains multiple members
-  MessageContent content;
+  ContentTuple content;
 };
 
-template<typename ... ArgT>
-auto make_message(const Actor& sender, size_t code, ArgT&& ... args) {
-  auto content = std::make_tuple(std::forward<ArgT>(args)...);
-  auto m = new TypedMessage<decltype(content)>(sender, code, std::move(content));
-  return m;
-}
-
-struct SerializedMessage : public Message {
+struct SerializedMessageBody : public MessageBody {
 public:
-  SerializedMessage(const Actor& sender_actor, size_t code);
+  SerializedMessageBody(Code code);
 
   bool is_serialized() const override;
-
-  void fill_with_element_addrs(std::vector<std::uintptr_t>&) const override;
-
-  virtual Deserializer make_deserializer() const = 0;
-
-  template<typename ArgTypes>
-  inline auto deseralize() {
-    auto&& content = this->deserialize_content<ArgTypes>();
-    auto m = new TypedMessage<decltype(content)>(
-      this->get_sender_actor(), this->get_code(), std::move(content));
-    m->set_type(this->get_type());
-    return m;
-  }
 
   template<typename ArgTypes>
   auto deserialize_content() {
     auto s = make_deserializer();
     return deserialize_content<ArgTypes, 0>(s);
   }
+
+  virtual Deserializer make_deserializer() const = 0;
 
 private:
   template<typename ArgTypes, size_t i, typename ... ArgT>
@@ -142,19 +186,22 @@ private:
 };
 
 template<typename T>
-struct TypedSerializedMessage;
+struct TypedSerializedMessageBody;
 
+// Used in ActorBehavior
 template<>
-struct TypedSerializedMessage<std::vector<char>> : public SerializedMessage {
+struct TypedSerializedMessageBody<std::vector<char>> : public SerializedMessageBody {
 public:
-  TypedSerializedMessage(const Actor& sender_actor,
-    size_t code, Type type, size_t types_hash, std::vector<char>&& bytes, size_t offset = 0);
-
-  SerializedMessage* serialize() const override;
+  TypedSerializedMessageBody(Code code, size_t types_hash,
+    std::vector<char>&& bytes, size_t offset = 0);
 
   Deserializer make_deserializer() const override;
 
-  size_t types_hash_code() const override;
+  size_t get_type_hash_code() const override;
+
+  void serialize(Serializer& s) override;
+
+  void serialize_content(Serializer& s) override;
 
 private:
   std::vector<char> content_bytes;
@@ -162,35 +209,97 @@ private:
   const size_t types_hash;
 };
 
+// Used in NetGate
 template<>
-struct TypedSerializedMessage<zmq::message_t> : public SerializedMessage {
+struct TypedSerializedMessageBody<zmq::message_t> : public SerializedMessageBody {
 public:
-  TypedSerializedMessage(const Actor& sender_actor,
-    size_t code, Type type, size_t types_hash, zmq::message_t&& bytes, size_t offset = 0);
-
-  SerializedMessage* serialize() const override;
+  TypedSerializedMessageBody(Code code, size_t types_hash,
+    zmq::message_t&& bytes, size_t offset = 0);
 
   Deserializer make_deserializer() const override;
 
-  size_t types_hash_code() const override;
+  size_t get_type_hash_code() const override;
+
+  void serialize(Serializer& s) override;
+
+  void serialize_content(Serializer& s) override;
 
 private:
-  zmq::message_t message_bytes;
+  zmq::message_t content_bytes;
   const size_t offset;
   const size_t types_hash;
 };
 
-template<typename MessageContent>
-SerializedMessage* TypedMessage<MessageContent>::serialize() const {
-  if constexpr (traits::all_message_content_serializable<MessageContent>::value) {
-    std::vector<char> bytes;
-    Serializer s(bytes);
-    serialize_elems(s, std::make_index_sequence<std::tuple_size<MessageContent>::value>{});
-    return new TypedSerializedMessage<std::vector<char>>{
-      this->get_sender_actor(), this->get_code(), this->get_type(), this->types_hash_code(), std::move(bytes)
-    };
-  } else {
-    throw ZAFException("The TypedMessage contains non-serializable element(s) but is required to be serialized.");
-  }
+template<typename ... ArgT>
+auto make_message(const Actor& sender, Message::Type t, Code code, ArgT&& ... args) {
+  auto body = std::make_tuple(std::forward<ArgT>(args)...);
+  using BodyType = decltype(body);
+  Message message;
+  message.set_type(t);
+  message.set_sender(sender);
+  message.set_body(std::make_unique<TypedMessageBody<BodyType>>(code, std::move(body)));
+  return message;
+}
+
+template<typename ... ArgT>
+auto make_message(const Actor& sender, Code code, ArgT&& ... args) {
+  return make_message(sender, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
+}
+
+template<typename ... ArgT>
+auto new_message(const Actor& sender, Message::Type t, Code code, ArgT&& ... args) {
+  auto body = std::make_tuple(std::forward<ArgT>(args)...);
+  using BodyType = decltype(body);
+  auto message = new Message();
+  message->set_type(t);
+  message->set_sender(sender);
+  message->set_body(std::make_unique<TypedMessageBody<BodyType>>(code, std::move(body)));
+  return message;
+}
+
+template<typename ... ArgT>
+auto new_message(const Actor& sender, Code code, ArgT&& ... args) {
+  return new_message(sender, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
+}
+
+template<typename ... ArgT>
+auto make_message(Code code, ArgT&& ... args) {
+  auto body = std::make_tuple(std::forward<ArgT>(args)...);
+  using BodyType = decltype(body);
+  return TypedMessageBody<BodyType>(code, std::move(body));
+}
+
+template<typename ... ArgT>
+auto new_message(Code code, ArgT&& ... args) {
+  auto body = std::make_tuple(std::forward<ArgT>(args)...);
+  using BodyType = decltype(body);
+  return new TypedMessageBody<BodyType>(code, std::move(body));
+}
+
+Message make_serialized_message(Message& m);
+
+Message* new_serialized_message(Message& m);
+
+TypedSerializedMessageBody<std::vector<char>>
+make_serialized_message(MessageBody& m);
+
+TypedSerializedMessageBody<std::vector<char>>*
+new_serialized_message(MessageBody& m);
+
+void serialize(Serializer&, MessageBody*);
+
+template<typename T,
+  typename std::enable_if_t<std::is_same_v<T, MessageBody*>>* = nullptr>
+T deserialize(Deserializer& s) {
+  auto code = s.read<Code>();
+  auto type_hash = s.read<size_t>();
+  auto num_bytes = s.read<unsigned>();
+  std::vector<char> bytes(num_bytes);
+  s.read_bytes(&bytes.front(), num_bytes);
+  return new TypedSerializedMessageBody<std::vector<char>>(
+    code,
+    type_hash,
+    std::move(bytes)
+  );
 }
 } // namespace zaf

@@ -22,25 +22,25 @@ namespace zaf {
  **/
 class NetGate {
 public:
-  constexpr static size_t NetGateCodeBase = (size_t(~0u) - 1) << (sizeof(size_t) << 2);
-  constexpr static Code NetGateConnReq        {NetGateCodeBase + 1};
-  constexpr static Code DataConnReq           {NetGateCodeBase + 2};
-  constexpr static Code Termination           {NetGateCodeBase + 3};
-  constexpr static Code FlushBuffer           {NetGateCodeBase + 4};
-  constexpr static Code ActorRegistration     {NetGateCodeBase + 5};
-  constexpr static Code ActorLookupReq        {NetGateCodeBase + 6};
-  constexpr static Code ActorLookupRep        {NetGateCodeBase + 7};
-  constexpr static Code RemoteActorLookupRep  {NetGateCodeBase + 8};
-  constexpr static Code RemoteActorLookupReq  {NetGateCodeBase + 9};
-  constexpr static Code BindPortReq           {NetGateCodeBase + 10};
-  constexpr static Code BindPortRep           {NetGateCodeBase + 11};
-  constexpr static Code Ping                  {NetGateCodeBase + 12};
-  constexpr static Code Pong                  {NetGateCodeBase + 13};
-  constexpr static Code PingRetry             {NetGateCodeBase + 14};
-  constexpr static Code RetrieveActorReq      {NetGateCodeBase + 15};
-  constexpr static Code RetrieveActorRep      {NetGateCodeBase + 16};
-  constexpr static Code NetGateBindPortReq    {NetGateCodeBase + 17};
-  constexpr static Code NetGateBindPortRep    {NetGateCodeBase + 18};
+  inline constexpr static size_t NetGateCodeBase = (size_t(~0u) - 1) << (sizeof(size_t) << 2);
+  inline constexpr static Code NetGateConnReq        {NetGateCodeBase + 1};
+  inline constexpr static Code DataConnReq           {NetGateCodeBase + 2};
+  inline constexpr static Code Termination           {NetGateCodeBase + 3};
+  inline constexpr static Code FlushBuffer           {NetGateCodeBase + 4};
+  inline constexpr static Code ActorRegistration     {NetGateCodeBase + 5};
+  inline constexpr static Code ActorLookupReq        {NetGateCodeBase + 6};
+  inline constexpr static Code ActorLookupRep        {NetGateCodeBase + 7};
+  inline constexpr static Code RemoteActorLookupRep  {NetGateCodeBase + 8};
+  inline constexpr static Code RemoteActorLookupReq  {NetGateCodeBase + 9};
+  inline constexpr static Code BindPortReq           {NetGateCodeBase + 10};
+  inline constexpr static Code BindPortRep           {NetGateCodeBase + 11};
+  inline constexpr static Code Ping                  {NetGateCodeBase + 12};
+  inline constexpr static Code Pong                  {NetGateCodeBase + 13};
+  inline constexpr static Code PingRetry             {NetGateCodeBase + 14};
+  inline constexpr static Code RetrieveActorReq      {NetGateCodeBase + 15};
+  inline constexpr static Code RetrieveActorRep      {NetGateCodeBase + 16};
+  inline constexpr static Code NetGateBindPortReq    {NetGateCodeBase + 17};
+  inline constexpr static Code NetGateBindPortRep    {NetGateCodeBase + 18};
 
 private:
   class Receiver : public ActorBehaviorX {
@@ -184,6 +184,7 @@ private:
     // Receivers will listen to "tcp://bind_host:*"
     std::string bind_host;
     int bind_port = 0;
+    std::string bind_url; // which is bind_host:bind_port
   };
 
 public:
@@ -191,17 +192,12 @@ public:
   NetGate(ActorSystem& actor_sys, const std::string& bind_host, int port);
 
   void initialize(ActorSystem& actor_sys, const std::string& bind_host, int port);
-  bool is_initialized() const;
   void terminate();
 
-  void connect(const std::string& host, int port);
-
-  void register_actor(const std::string& name, const Actor& actor);
-
-  Actor actor() const;
+  const Actor& actor() const;
 
 private:
+  ActorSystem* actor_sys = nullptr;
   Actor net_gate_actor = nullptr;
-  ScopedActor<ActorBehavior> self = nullptr;
 };
 } // namespace zaf

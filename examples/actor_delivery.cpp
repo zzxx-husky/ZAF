@@ -85,13 +85,19 @@ int main(int argc, char** argv) {
   std::thread machine_a([]() {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 12345};
-    gate.register_actor("a_x", actor_system.spawn<X>());
+    auto sender = actor_system.create_scoped_actor();
+    zaf::NetGateClient client{gate.actor()};
+    client.register_actor(*sender, "a_x", actor_system.spawn<X>());
   });
   std::thread machine_b([]() {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 23456};
     auto y = actor_system.spawn<Y>(zaf::NetGateClient{gate.actor()});
-    gate.register_actor("b_y", y);
+    {
+      auto sender = actor_system.create_scoped_actor();
+      zaf::NetGateClient client{gate.actor()};
+      client.register_actor(*sender, "b_y", y);
+    }
     actor_system.spawn([&](zaf::ActorBehavior& w) {
       w.send(y, BWReg);
       w.receive_once({

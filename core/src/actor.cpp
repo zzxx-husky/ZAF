@@ -1,5 +1,6 @@
 #include "zaf/actor.hpp"
 #include "zaf/hash.hpp"
+#include "zaf/traits.hpp"
 
 namespace zaf {
 LocalActorHandle::LocalActorHandle(ActorIdType id, bool use_swsr):
@@ -98,15 +99,25 @@ ActorInfo Actor::to_actor_info(const Actor& requester) const {
     [&](const LocalActorHandle& l) {
       std::string url = requester.visit(overloaded{
         [&](const LocalActorHandle& l) {
-          // a local actor requests the actor info of another local actor
           return std::string("");
         },
         [&](const RemoteActorHandle& r) {
-          // a remote actor requests the actor info of a local actor
           return r.net_sender_info->local_net_gate_url;
         }
       });
-      return ActorInfo{l, url};
+      return ActorInfo{l, std::move(url)};
+    },
+    [&](const RemoteActorHandle& r) {
+      // a remote actor requests the actor info of a remote actor
+      return ActorInfo{r.remote_actor, r.net_sender_info->remote_net_gate_url};
+    }
+  });
+}
+
+ActorInfo Actor::to_actor_info(const std::string& local_net_gate_url) const {
+  return this->visit(overloaded{
+    [&](const LocalActorHandle& l) {
+      return ActorInfo{l, local_net_gate_url};
     },
     [&](const RemoteActorHandle& r) {
       // a remote actor requests the actor info of a remote actor
@@ -137,14 +148,8 @@ std::ostream& operator<<(std::ostream& out, const RemoteActorHandle& a) {
 
 std::ostream& operator<<(std::ostream& out, const Actor& a) {
   a.visit(overloaded{
-    [&](const LocalActorHandle& l) {
-      out << l;
-    },
-    [&](const RemoteActorHandle& r) {
-      out << r;
-    }
+    [&](auto& l) { out << l; },
   });
   return out;
 }
-
 } // namespace zaf
