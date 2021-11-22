@@ -16,10 +16,6 @@ void Message::set_sender(const Actor& sender) {
   this->sender_actor = sender;
 }
 
-void Message::set_type(Type t) {
-  this->type = t;
-}
-
 MessageBody& Message::get_body() {
   return *body;
 }
@@ -30,10 +26,6 @@ const MessageBody& Message::get_body() const {
 
 const Actor& Message::get_sender() const {
   return sender_actor;
-}
-
-Message::Type Message::get_type() const {
-  return this->type;
 }
 
 MessageBody::MessageBody(Code code):
@@ -117,7 +109,6 @@ void TypedSerializedMessageBody<zmq::message_t>::serialize_content(Serializer& s
 Message make_serialized_message(Message& m) {
   Message message;
   message.set_sender(m.get_sender());
-  message.set_type(m.get_type());
   auto& body = m.get_body();
   std::vector<char> bytes;
   Serializer s{bytes};
@@ -133,7 +124,6 @@ Message make_serialized_message(Message& m) {
 Message* new_serialized_message(Message& m) {
   auto message = new Message();
   message->set_sender(m.get_sender());
-  message->set_type(m.get_type());
   auto& body = m.get_body();
   std::vector<char> bytes;
   Serializer s{bytes};

@@ -42,7 +42,6 @@ void NetGate::Receiver::receive_once_from_net() {
   for (unsigned i = 0; i < num_messages; i++) {
     auto send_actor = deserialize<LocalActorHandle>(s);
     auto recv_actor = deserialize<LocalActorHandle>(s);
-    auto message_type = deserialize<Message::Type>(s);
     auto message_code = deserialize<Code>(s);
     auto types_hash = deserialize<size_t>(s);
     auto num_bytes = deserialize<unsigned>(s);
@@ -50,7 +49,6 @@ void NetGate::Receiver::receive_once_from_net() {
     s.read_bytes(&bytes.front(), num_bytes);
     auto message = new Message();
     message->set_sender(Actor{RemoteActorHandle{net_sender_info, send_actor}});
-    message->set_type(message_type);
     message->set_body(std::make_unique<TypedSerializedMessageBody<std::vector<char>>>(
       message_code,
       types_hash,
@@ -243,7 +241,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
         // no other else is asking for the same actor
         this->send_to_net_gate(url, RemoteActorLookupReq, name);
       }
-      requesters.push_back(this->take_current_message());
+      requesters.push_back(std::move(this->take_current_message()));
     },
     NetGate::RemoteActorLookupReq - [&](const std::string& name) {
       std::string peer{
@@ -329,7 +327,6 @@ void NetGate::NetGateActor::receive_once_from_net_gate(MessageHandlers& handlers
   auto types_hash = deserialize<size_t>(s);
   Message message;
   message.set_sender(Actor{});
-  message.set_type(Message::Type::Normal);
   message.set_body(std::make_unique<TypedSerializedMessageBody<zmq::message_t>>(
     msg_code,
     types_hash,

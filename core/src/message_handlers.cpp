@@ -12,17 +12,30 @@ MessageHandlers& MessageHandlers::operator=(MessageHandlers&& other) {
 
 bool MessageHandlers::try_process(MessageBody& body) {
   auto iter = handlers.find(body.get_code());
-  if (iter == handlers.end()) {
-    return this->child
-      ? this->child->try_process(body)
-      : false;
+  if (iter != handlers.end()) {
+    iter->second->process(body);
+    return true;
   }
-  iter->second->process(body);
-  return true;
+  if (this->child && this->child->try_process(body)) {
+    return true;
+  }
+  return false;
 }
 
 bool MessageHandlers::try_process(Message& m) {
-  return this->try_process(m.get_body());
+  auto iter = handlers.find(m.get_body().get_code());
+  if (iter != handlers.end()) {
+    iter->second->process(m.get_body());
+    return true;
+  }
+  if (this->child && this->child->try_process(m)) {
+    return true;
+  }
+  if (default_handler) {
+    default_handler->process(m);
+    return true;
+  }
+  return false;
 }
 
 void MessageHandlers::process(MessageBody& body) {
@@ -34,13 +47,21 @@ void MessageHandlers::process(MessageBody& body) {
 }
 
 void MessageHandlers::process(Message& m) {
-  this->process(m.get_body());
+  if (!try_process(m)) {
+    throw ZAFException(
+      "Handler for code ", m.get_body().get_code(), " not found."
+    );
+  }
 }
 
 void MessageHandlers::add_handlers() {}
 
 void MessageHandlers::add_child_handlers(MessageHandlers& child) {
   this->child = &child;
+}
+
+void MessageHandlers::remove_child_handlers() {
+  this->child = nullptr;
 }
 
 MessageHandlers& MessageHandlers::get_child_handlers() {

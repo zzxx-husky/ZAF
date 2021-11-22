@@ -11,13 +11,40 @@
 namespace zaf {
 // Store the type-erased user-defined message handler
 struct MessageHandler {
-  void process(Message& m);
-  void process(MessageBody& body);
-
+  virtual void process(Message& m);
+  virtual void process(MessageBody& body);
   virtual void process(MemoryMessageBody& body) = 0;
   virtual void process(SerializedMessageBody& body) = 0;
 
   virtual ~MessageHandler() = default;
+};
+
+template<typename Handler>
+class RawMessageHandler : public MessageHandler {
+private:
+  Handler handler;
+
+public:
+  template<typename H>
+  RawMessageHandler(H&& handler):
+    handler(std::forward<H>(handler)) {
+  }
+
+  void process(Message& m) override {
+    handler(m);
+  }
+
+  void process(MessageBody& body) override {
+    throw ZAFException("RawMessageHandler does not process MessageBody.");
+  }
+
+  void process(MemoryMessageBody& body) override {
+    throw ZAFException("RawMessageHandler does not process MemoryMessageBody.");
+  }
+
+  void process(SerializedMessageBody& body) override {
+    throw ZAFException("RawMessageHandler does not process SerializedMessageBody.");
+  }
 };
 
 // Store the original user-defined message handler
@@ -110,7 +137,18 @@ public:
 template<typename Handler>
 inline auto operator-(Code code, Handler&& user_handler) {
   using HandlerX = traits::remove_cvref_t<Handler>;
-  MessageHandler* handler = new TypedMessageHandler<HandlerX>(std::forward<Handler>(user_handler));
+  MessageHandler* handler;
+  if (code == DefaultCodes::DefaultMessageHandler) {
+    if constexpr (std::is_invocable_v<Handler, Message&>) {
+      handler = new RawMessageHandler<HandlerX>(std::forward<Handler>(user_handler));
+    } else {
+      throw ZAFException("Invalid message handler type for "
+        "DefaultCodes::DefaultMessageHandler, which expects "
+        "void(Message&).");
+    }
+  } else {
+    handler = new TypedMessageHandler<HandlerX>(std::forward<Handler>(user_handler));
+  }
   return std::make_pair(code.value, std::unique_ptr<MessageHandler>(handler));
 }
 } // namespace zaf

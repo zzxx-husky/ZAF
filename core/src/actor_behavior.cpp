@@ -1,6 +1,5 @@
 #include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
-#include "zaf/count_pointer.hpp"
 #include "zaf/thread_utils.hpp"
 #include "zaf/zaf_exception.hpp"
 
@@ -54,6 +53,14 @@ ActorBehavior::DelayedMessage::~DelayedMessage() {
   }, message);
 }
 
+ActorBehavior::ActorBehavior() {
+  inner_handlers.add_handlers(
+    DefaultCodes::Request - [&](std::unique_ptr<MessageBody>& request) {
+      inner_handlers.process(*request);
+    }
+  );
+}
+
 void ActorBehavior::start() {}
 
 void ActorBehavior::stop() {}
@@ -72,13 +79,11 @@ Actor ActorBehavior::get_self_actor() {
   return Actor{get_local_actor_handle()};
 }
 
-CountPointer<Message> ActorBehavior::take_current_message() {
+Message ActorBehavior::take_current_message() {
   if (!this->current_message) {
     throw ZAFException("Attempt to take null message.");
   }
-  CountPointer<Message> msg{this->current_message};
-  this->current_message = nullptr;
-  return msg;
+  return std::move(*this->current_message);
 }
 
 const Message& ActorBehavior::get_current_message() const {
@@ -163,9 +168,10 @@ bool ActorBehavior::receive_once(MessageHandlers&& handlers, long timeout) {
 }
 
 bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
-  inner_handlers.add_child_handlers(handlers);
   return this->receive_once([&](Message* m) {
+    auto prev_message = this->current_message;
     this->current_message = m;
+    inner_handlers.add_child_handlers(handlers);
     try {
       inner_handlers.process(*m);
     } catch (...) {
@@ -173,10 +179,11 @@ bool ActorBehavior::receive_once(MessageHandlers& handlers, long timeout) {
         "Exception caught when processing a message with code ", m->get_body().get_code(),
         " (", std::hex, m->get_body().get_code(), ")."));
     }
+    inner_handlers.remove_child_handlers();
     if (this->current_message) {
       delete this->current_message;
-      this->current_message = nullptr;
     }
+    this->current_message = prev_message;
   }, timeout);
 }
 
@@ -353,27 +360,25 @@ void ActorBehavior::RequestHandler::on_reply(MessageHandlers&& handlers) {
 void ActorBehavior::RequestHandler::on_reply(MessageHandlers& handlers) {
   ++self.waiting_for_response;
   auto cur_act = self.is_activated();
-  self.receive([&](Message* m) {
-    if (m->get_type() == Message::Type::Response) {
-      auto cur_msg = self.current_message;
-      self.current_message = m;
+  self.receive({
+    DefaultCodes::Response - [&](std::unique_ptr<MessageBody>& rep) {
       try {
-        handlers.process(*m);
+        handlers.process(*rep);
       } catch (...) {
         std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", m->get_body().get_code(),
-          " (", std::hex, m->get_body().get_code(), ")."));
+          "Exception caught when processing a message with code ", rep->get_code(),
+          " (", std::hex, rep->get_code(), ")."));
       }
-      if (self.current_message) {
-        delete self.current_message;
-      }
-      self.current_message = cur_msg;
       self.deactivate();
-    } else {
-      self.pending_messages.push_back(m);
+    },
+    DefaultCodes::DefaultMessageHandler - [&](Message&) {
+      self.pending_messages.push_back(self.current_message);
+      self.current_message = nullptr;
     }
   });
-  if (cur_act) { self.activate(); }
+  if (cur_act) {
+    self.activate();
+  }
   --self.waiting_for_response;
 }
 
@@ -398,7 +403,7 @@ void ActorBehavior::flush_delayed_messages() {
       },
       [&](MessageBytes& m) {
         RemoteActorHandle& r = static_cast<RemoteActorHandle&>(msg.receiver);
-        this->send(r.net_sender_info->net_sender, Message::Type::Normal,
+        this->send(r.net_sender_info->net_sender,
           DefaultCodes::ForwardMessage, std::move(m.header), std::move(m.content));
       }
     }, msg.message);

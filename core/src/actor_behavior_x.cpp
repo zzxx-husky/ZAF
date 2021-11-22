@@ -42,9 +42,7 @@ void ActorBehaviorX::send(const LocalActorHandle& actor, Message* m) {
   if (!actor) {
     return;
   }
-  if (!actor.use_swsr_msg_delivery ||
-      m->get_type() == Message::Type::Request ||
-      m->get_type() == Message::Type::Response) {
+  if (!actor.use_swsr_msg_delivery) {
     this->ActorBehavior::send(actor, m);
     return;
   }

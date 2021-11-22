@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "actor.hpp"
-#include "count_pointer.hpp"
 #include "message_handlers.hpp"
 #include "zaf_exception.hpp"
 
@@ -46,12 +45,11 @@ public:
 
     template<typename ... ArgT>
     static MessageBytes make(const LocalActorHandle& send, const LocalActorHandle& recv,
-      Message::Type type, Code code, ArgT&& ... args) {
+      Code code, ArgT&& ... args) {
       MessageBytes bytes;
       bytes.header.reserve(
         LocalActorHandle::SerializationSize +
         LocalActorHandle::SerializationSize +
-        sizeof(type) +
         sizeof(code) +
         sizeof(size_t) +
         sizeof(unsigned)
@@ -59,7 +57,6 @@ public:
       Serializer(bytes.header)
         .write(send)
         .write(recv)
-        .write(type)
         .write(code)
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...));
       Serializer(bytes.content)
@@ -87,7 +84,7 @@ public:
     ~DelayedMessage();
   };
 
-  ActorBehavior() = default;
+  ActorBehavior();
 
   /**
    * To be overrided by subclass
@@ -99,53 +96,43 @@ public:
   // send a normal message to message sender
   template<typename ... ArgT>
   inline void reply(Code code, ArgT&& ... args) {
-    auto type = this->get_current_message().get_type() == Message::Type::Request
-      ? Message::Type::Response
-      : Message::Type::Normal;
-    this->send(this->get_current_message().get_sender(),
-      type, code, std::forward<ArgT>(args)...);
+    if (this->get_current_message().get_body().get_code() == DefaultCodes::Request) {
+      this->send(this->get_current_sender_actor(), DefaultCodes::Response,
+        std::unique_ptr<MessageBody>(
+          new_message(code, std::forward<ArgT>(args) ...)
+        ));
+    } else {
+      this->send(this->get_current_sender_actor(), code, std::forward<ArgT>(args)...);
+    }
   }
 
   // reply a message to the sender of the `msg`
   template<typename ... ArgT>
   inline void reply(Message& msg, Code code, ArgT&& ... args) {
-    auto type = msg.get_type() == Message::Type::Request
-      ? Message::Type::Response
-      : Message::Type::Normal;
-    this->send(msg.get_sender(), type, code, std::forward<ArgT>(args) ...);
+    if (msg.get_body().get_code() == DefaultCodes::Request) {
+      this->send(msg.get_sender(),
+        DefaultCodes::Response, std::unique_ptr<MessageBody>(
+          new_message(code, std::forward<ArgT>(args) ...)
+        ));
+    } else {
+      this->send(msg.get_sender(), code, std::forward<ArgT>(args)...);
+    }
   }
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
   inline void send(ActorBehavior& receiver, Code code, ArgT&& ... args) {
-    this->send(receiver.get_local_actor_handle(),
-      Message::Type::Normal, code, std::forward<ArgT>(args)...);
-  }
-
-  template<typename ... ArgT>
-  inline void send(ActorBehavior& receiver, Message::Type type, Code code, ArgT&& ... args) {
-    this->send(receiver.get_local_actor_handle(), type, code, std::forward<ArgT>(args)...);
+    this->send(receiver.get_local_actor_handle(), code, std::forward<ArgT>(args)...);
   }
 
   // send a message to Actor
   template<typename ... ArgT>
-  inline void send(const Actor& receiver, Code code, ArgT&& ... args) {
-    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
-  }
-
-  template<typename ... ArgT>
-  void send(const Actor& receiver, Message::Type type, Code code, ArgT&& ... args);
+  void send(const Actor& receiver, Code code, ArgT&& ... args);
 
   // send a message to LocalActorHandle
   template<typename ... ArgT>
   void send(const LocalActorHandle& receiver, Code code, ArgT&& ... args) {
-    this->send(receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
-  }
-
-  template<typename ... ArgT>
-  void send(const LocalActorHandle& receiver, Message::Type type,
-    Code code, ArgT&& ... args) {
-    auto m = new_message(Actor{this->get_local_actor_handle()}, type,
+    auto m = new_message(Actor{this->get_local_actor_handle()},
       code, std::forward<ArgT>(args)...);
     this->send(receiver, m);
   }
@@ -188,24 +175,12 @@ public:
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
     Code code, ArgT&& ... args) {
     this->delayed_send(delay, Actor{receiver.get_local_actor_handle()},
-      Message::Type::Normal, code, std::forward<ArgT>(args) ...);
-  }
-
-  template<typename Rep, typename Period, typename ... ArgT>
-  void delayed_send(const std::chrono::duration<Rep, Period>& delay, ActorBehavior& receiver,
-    Message::Type type, Code code, ArgT&& ... args) {
-    this->delayed_send(delay, receiver.get_local_actor_handle(), type, code, std::forward<ArgT>(args) ...);
+      code, std::forward<ArgT>(args) ...);
   }
 
   template<typename Rep, typename Period, typename ... ArgT>
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
-    Code code, ArgT&& ... args) {
-    this->delayed_send(delay, receiver, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
-  }
-
-  template<typename Rep, typename Period, typename ... ArgT>
-  void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
-    Message::Type type, Code code, ArgT&& ... args);
+    Code code, ArgT&& ... args);
 
   struct RequestHandler {
     ActorBehavior& self;
@@ -215,8 +190,9 @@ public:
 
   template<typename Receiver, typename ... ArgT>
   inline RequestHandler request(Receiver&& receiver, Code code, ArgT&& ... args) {
-    this->send(receiver, Message::Type::Request, code,
-      std::forward<ArgT>(args) ...);
+    this->send(receiver, DefaultCodes::Request, std::unique_ptr<MessageBody>(
+      new_message(code, std::forward<ArgT>(args) ...)
+    ));
     return {*this};
   }
 
@@ -225,7 +201,7 @@ public:
   Actor get_self_actor();
   Actor get_current_sender_actor() const;
 
-  CountPointer<Message> take_current_message();
+  Message take_current_message();
   const Message& get_current_message() const;
 
   void activate();
@@ -276,7 +252,8 @@ protected:
   bool activated = false;
   Message* current_message = nullptr;
 
-  int waiting_for_response = 0;
+  // to handle recursive request/response
+  unsigned waiting_for_response = 0;
   std::deque<Message*> pending_messages;
 
   ActorIdType actor_id{~0u};

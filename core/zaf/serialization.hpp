@@ -1,6 +1,7 @@
 // To be included inside serializer.hpp
 
 #include <optional>
+#include <memory>
 #include <string>
 #include <type_traits>
 

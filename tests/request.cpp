@@ -46,7 +46,8 @@ GTEST_TEST(Request, ByResponse) {
       EXPECT_EQ(hw, "Hello World");
       actor2.send(actor2.get_current_sender_actor(), 2, hw);
       std::reverse(hw.begin(), hw.end());
-      actor2.send(actor2.get_current_sender_actor(), Message::Type::Response, Code{1}, hw);
+      actor2.send(actor2.get_current_sender_actor(), DefaultCodes::Response,
+        std::unique_ptr<MessageBody>(new_message(Code{1}, hw)));
     }
   });
 
@@ -121,14 +122,16 @@ GTEST_TEST(Request, ByResponse2) {
       Code{0} - [&]() {
         target = self.get_current_sender_actor(); 
         if (requester) {
-          self.send(requester, Message::Type::Response, Code{1}, target);
+          self.send(requester, DefaultCodes::Response,
+            std::unique_ptr<MessageBody>(new_message(Code{1}, target)));
           self.deactivate();
         }
       },
       Code{1} - [&]() {
         requester = self.get_current_sender_actor();
         if (target) {
-          self.send(requester, Message::Type::Response, Code{1}, target);
+          self.send(requester, DefaultCodes::Response,
+            std::unique_ptr<MessageBody>(new_message(Code{1}, target)));
           self.deactivate();
         }
       }

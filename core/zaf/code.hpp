@@ -22,5 +22,8 @@ struct DefaultCodes {
   inline constexpr static Code SWSRMsgQueueNotification {ZAFCodeBase + 3};
   inline constexpr static Code SWSRMsgQueueTermination  {ZAFCodeBase + 4};
   inline constexpr static Code SWSRMsgQueueConsumption  {ZAFCodeBase + 5};
+  inline constexpr static Code Request                  {ZAFCodeBase + 6};
+  inline constexpr static Code Response                 {ZAFCodeBase + 7};
+  inline constexpr static Code DefaultMessageHandler    {ZAFCodeBase + 8};
 };
 } // namespace zaf

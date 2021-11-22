@@ -108,7 +108,6 @@ private:
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
-        // not writing msg_type here because it only sends Message::Type::Normal messages
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
@@ -127,7 +126,6 @@ private:
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
-        // not writing msg_type here because it only sends Message::Type::Normal messages
         .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
@@ -157,7 +155,7 @@ private:
       // remote actor name -> request message (which contains the requesters)
       std::unordered_map<
         std::string,
-        std::vector<CountPointer<Message>>
+        std::vector<Message>
       > actor_lookup_requesters;
       // a buffer storing messages that are pending and waiting for the `pong` message from peer net gate
       std::vector<zmq::message_t> pending_messages;

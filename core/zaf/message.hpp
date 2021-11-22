@@ -40,12 +40,6 @@ private:
 
 class Message {
 public:
-  enum Type : uint8_t {
-    Normal = 0,
-    Request = 1,
-    Response = 2,
-  };
-
   Message() = default;
   Message(const Message&) = delete;
   Message& operator=(const Message&) = delete;
@@ -55,15 +49,12 @@ public:
   void set_body(MessageBody* body);
   void set_body(std::unique_ptr<MessageBody>&& body);
   void set_sender(const Actor& sender);
-  void set_type(Type t);
 
   MessageBody& get_body();
   const MessageBody& get_body() const;
   const Actor& get_sender() const;
-  Type get_type() const;
 
 private:
-  Type type = Normal;
   Actor sender_actor = nullptr;
   std::unique_ptr<MessageBody> body = nullptr;
 };
@@ -231,35 +222,23 @@ private:
 };
 
 template<typename ... ArgT>
-auto make_message(const Actor& sender, Message::Type t, Code code, ArgT&& ... args) {
+auto make_message(const Actor& sender, Code code, ArgT&& ... args) {
   auto body = std::make_tuple(std::forward<ArgT>(args)...);
   using BodyType = decltype(body);
   Message message;
-  message.set_type(t);
   message.set_sender(sender);
   message.set_body(std::make_unique<TypedMessageBody<BodyType>>(code, std::move(body)));
   return message;
 }
 
 template<typename ... ArgT>
-auto make_message(const Actor& sender, Code code, ArgT&& ... args) {
-  return make_message(sender, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
-}
-
-template<typename ... ArgT>
-auto new_message(const Actor& sender, Message::Type t, Code code, ArgT&& ... args) {
+auto new_message(const Actor& sender, Code code, ArgT&& ... args) {
   auto body = std::make_tuple(std::forward<ArgT>(args)...);
   using BodyType = decltype(body);
   auto message = new Message();
-  message->set_type(t);
   message->set_sender(sender);
   message->set_body(std::make_unique<TypedMessageBody<BodyType>>(code, std::move(body)));
   return message;
-}
-
-template<typename ... ArgT>
-auto new_message(const Actor& sender, Code code, ArgT&& ... args) {
-  return new_message(sender, Message::Type::Normal, code, std::forward<ArgT>(args) ...);
 }
 
 template<typename ... ArgT>
