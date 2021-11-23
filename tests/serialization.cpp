@@ -2,6 +2,7 @@
 #include <deque>
 #include <list>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -9,6 +10,8 @@
 
 #include "zaf/actor.hpp"
 #include "zaf/actor_behavior.hpp"
+#include "zaf/count_pointer.hpp"
+#include "zaf/macros.hpp"
 #include "zaf/message.hpp"
 #include "zaf/message_handler.hpp"
 #include "zaf/serializer.hpp"
@@ -31,6 +34,7 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_FALSE(traits::all_serializable<Z>::value);
   EXPECT_TRUE((traits::all_serializable<std::pair<int, int>>::value));
   EXPECT_TRUE((traits::all_serializable<std::pair<const int, int>>::value));
+  EXPECT_FALSE((traits::all_serializable<std::pair<Z, int>>::value));
   EXPECT_TRUE((traits::all_serializable<int, int, int, int, int>::value));
   EXPECT_TRUE((traits::all_serializable<const int, int, int, int, const char>::value));
   EXPECT_FALSE((traits::all_serializable<Z, int, int, int, const char>::value));
@@ -42,7 +46,24 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_TRUE(traits::all_serializable<std::set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<std::unordered_map<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<std::unordered_set<int>>::value);
+  EXPECT_TRUE((traits::all_serializable<DefaultHashMap<int, int>>::value));
+  EXPECT_TRUE(traits::all_serializable<DefaultHashSet<int>>::value);
   EXPECT_FALSE((traits::all_serializable<std::array<int, 4>>::value));
+  EXPECT_FALSE(traits::all_serializable<std::vector<Z>>::value);
+  EXPECT_FALSE(traits::all_serializable<std::deque<Z>>::value);
+  EXPECT_FALSE(traits::all_serializable<std::list<Z>>::value);
+  EXPECT_FALSE((traits::all_serializable<std::map<int, Z>>::value));
+  EXPECT_FALSE(traits::all_serializable<std::set<Z>>::value);
+  EXPECT_FALSE((traits::all_serializable<std::unordered_map<int, Z>>::value));
+  EXPECT_FALSE(traits::all_serializable<std::unordered_set<Z>>::value);
+  EXPECT_FALSE((traits::all_serializable<DefaultHashMap<int, Z>>::value));
+  EXPECT_FALSE(traits::all_serializable<DefaultHashSet<Z>>::value);
+  EXPECT_TRUE(traits::all_serializable<std::unique_ptr<int>>::value);
+  EXPECT_TRUE(traits::all_serializable<std::shared_ptr<int>>::value);
+  EXPECT_TRUE(traits::all_serializable<CountPointer<int>>::value);
+  EXPECT_FALSE(traits::all_serializable<std::unique_ptr<Z>>::value);
+  EXPECT_FALSE(traits::all_serializable<std::shared_ptr<Z>>::value);
+  EXPECT_FALSE(traits::all_serializable<CountPointer<Z>>::value);
   // Actor
   EXPECT_TRUE((traits::all_serializable<ActorInfo>::value));
   EXPECT_FALSE((traits::all_serializable<Actor>::value));

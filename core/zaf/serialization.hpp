@@ -145,7 +145,8 @@ void deserialize(Deserializer& s, Iterable& it) {
 }
 
 // 4. Serialization for std::pair
-template<typename A, typename B>
+template<typename A, typename B,
+  std::enable_if_t<traits::is_savable<A>::value && traits::is_savable<B>::value>* = nullptr>
 void serialize(Serializer& s, const std::pair<A, B>& p) {
   serialize(s, p.first);
   serialize(s, p.second);
@@ -154,7 +155,8 @@ void serialize(Serializer& s, const std::pair<A, B>& p) {
 template<typename P,
   std::enable_if_t<traits::is_pair<P>::value>* = nullptr,
   typename A = typename traits::is_pair<P>::first_type,
-  typename B = typename traits::is_pair<P>::second_type>
+  typename B = typename traits::is_pair<P>::second_type,
+  std::enable_if_t<traits::is_loadable<A>::value && traits::is_loadable<B>::value>* = nullptr>
 std::pair<A, B> deserialize(Deserializer& s) {
   auto a = deserialize<traits::remove_cvref_t<A>>(s);
   auto b = deserialize<traits::remove_cvref_t<B>>(s);
@@ -177,7 +179,10 @@ inline void deserialize(Deserializer& s, std::string& str) {
 
 // 6. Serialization for std::optional
 template<typename T,
-  typename std::enable_if_t<!std::is_reference_v<T>>* = nullptr>
+  typename std::enable_if_t<
+    !std::is_reference_v<T> &&
+    traits::is_savable<T>::value
+  >* = nullptr>
 inline void serialize(Serializer& s, const std::optional<T>& o) {
   bool has_value = o.has_value();
   s.write(has_value);
@@ -187,14 +192,18 @@ inline void serialize(Serializer& s, const std::optional<T>& o) {
 }
 
 template<typename T,
-  typename std::enable_if_t<!std::is_reference_v<T>>* = nullptr>
+  typename std::enable_if_t<
+    !std::is_reference_v<T> &&
+    traits::is_loadable<T>::value
+  >* = nullptr>
 inline void deserialize(Deserializer& s, std::optional<T>& o) {
   if (s.read<bool>()) {
     o = std::move(s.read<T>());
   }
 }
 
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
 void deserialize(Deserializer& s, CountPointer<T>& ptr) {
   if (s.read<bool>()) {
     auto ptr = s.read<T*>();
@@ -204,7 +213,8 @@ void deserialize(Deserializer& s, CountPointer<T>& ptr) {
   }
 }
 
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
 void serialize(Serializer& s, const CountPointer<T>& ptr) {
   if (bool(ptr)) {
     s.write(true).write(ptr.get());
@@ -213,7 +223,8 @@ void serialize(Serializer& s, const CountPointer<T>& ptr) {
   }
 }
 
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
 void deserialize(Deserializer& s, std::unique_ptr<T>& ptr) {
   if (s.read<bool>()) {
     ptr = std::unique_ptr<T>(s.read<T*>());
@@ -222,8 +233,29 @@ void deserialize(Deserializer& s, std::unique_ptr<T>& ptr) {
   }
 }
 
-template<typename T>
+template<typename T,
+  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
 void serialize(Serializer& s, const std::unique_ptr<T>& ptr) {
+  if (bool(ptr)) {
+    s.write(true).write(ptr.get());
+  } else {
+    s.write(false);
+  }
+}
+
+template<typename T,
+  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
+void deserialize(Deserializer& s, std::shared_ptr<T>& ptr) {
+  if (s.read<bool>()) {
+    ptr = std::shared_ptr<T>(s.read<T*>());
+  } else {
+    ptr = nullptr;
+  }
+}
+
+template<typename T,
+  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
+void serialize(Serializer& s, const std::shared_ptr<T>& ptr) {
   if (bool(ptr)) {
     s.write(true).write(ptr.get());
   } else {
