@@ -20,17 +20,12 @@ public:
   // send a normal message to message sender
   template<typename ... ArgT>
   inline void reply(Code code, ArgT&& ... args) {
-    if (this->get_current_message().get_body().get_code() == DefaultCodes::Request) {
-      this->ActorBehavior::reply(code, std::forward<ArgT>(args) ...);
-    } else {
-      this->send(this->get_current_sender_actor(),
-        code, std::forward<ArgT>(args)...);
-    }
+    this->reply(this->get_current_message(), code, std::forward<ArgT>(args) ...);
   }
 
   // reply a message to the sender of the `msg`
   template<typename ... ArgT>
-  inline void reply(Message& msg, Code code, ArgT&& ... args) {
+  inline void reply(const Message& msg, Code code, ArgT&& ... args) {
     if (msg.get_body().get_code() == DefaultCodes::Request) {
       this->ActorBehavior::reply(msg, code, std::forward<ArgT>(args) ...);
     } else {

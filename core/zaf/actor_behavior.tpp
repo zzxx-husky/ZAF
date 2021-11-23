@@ -1,5 +1,17 @@
 namespace zaf {
 template<typename ... ArgT>
+void ActorBehavior::reply(const Message& msg, Code code, ArgT&& ... args) {
+  if (msg.get_body().get_code() == DefaultCodes::Request) {
+    this->send(msg.get_sender(), DefaultCodes::Response,
+      get_request_id(msg), std::unique_ptr<MessageBody>(
+        new_message(code, std::forward<ArgT>(args) ...)
+      ));
+  } else {
+    this->send(msg.get_sender(), code, std::forward<ArgT>(args)...);
+  }
+}
+
+template<typename ... ArgT>
 void ActorBehavior::send(const Actor& receiver, Code code, ArgT&& ... args) {
   if (!receiver) {
     return; // ignore message sent to null actor

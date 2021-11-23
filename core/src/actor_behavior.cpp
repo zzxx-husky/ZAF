@@ -1,13 +1,26 @@
+#include <chrono>
+#include <memory>
+#include <string>
+
+#include "zaf/actor.hpp"
 #include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
+#include "zaf/count_pointer.hpp"
 #include "zaf/thread_utils.hpp"
 #include "zaf/zaf_exception.hpp"
+
+#include "zmq.hpp"
 
 namespace zaf {
 ActorBehavior::ActorBehavior() {
   inner_handlers.add_handlers(
-    DefaultCodes::Request - [&](std::unique_ptr<MessageBody>& request) {
+    DefaultCodes::Request -
+    [&](unsigned req_id, std::unique_ptr<MessageBody>& request) {
       inner_handlers.process_body(*request);
+    },
+    DefaultCodes::Response -
+    [&](unsigned req_id, std::unique_ptr<MessageBody>& response) {
+      store_response(req_id, response);
     }
   );
 }
@@ -37,6 +50,13 @@ CountPointer<Message> ActorBehavior::take_current_message() {
   CountPointer<Message> ptr{this->current_message};
   this->current_message = nullptr;
   return ptr;
+}
+
+Message& ActorBehavior::get_current_message() {
+  if (!this->current_message) {
+    throw ZAFException("Attempt to get null message.");
+  }
+  return *this->current_message;
 }
 
 const Message& ActorBehavior::get_current_message() const {
@@ -305,34 +325,80 @@ const std::string& ActorBehavior::get_routing_id(ActorIdType id, bool send_or_re
   return routing_id_buffer;
 }
 
+ActorBehavior::RequestHandler::RequestHandler(ActorBehavior& self, unsigned req_id):
+  self(&self),
+  request_id(req_id) {
+  this->self->unfinished_requests.emplace(req_id, nullptr);
+}
+
+ActorBehavior::RequestHandler::RequestHandler(RequestHandler&& other):
+  self(other.self),
+  request_id(other.request_id) {
+  other.self = nullptr;
+}
+
+ActorBehavior::RequestHandler&
+ActorBehavior::RequestHandler::operator=(ActorBehavior::RequestHandler&& other) {
+  self = other.self;
+  request_id = other.request_id;
+  other.self = nullptr;
+  return *this;
+}
+
+ActorBehavior::RequestHandler::~RequestHandler() {
+  if (self) {
+    self->unfinished_requests.erase(request_id);
+  }
+}
+
 void ActorBehavior::RequestHandler::on_reply(MessageHandlers&& handlers) {
   this->on_reply(handlers);
 }
 
 // Note: need to store the current status of ActorBehavior and create a new round of `receive`
 void ActorBehavior::RequestHandler::on_reply(MessageHandlers& handlers) {
-  ++self.waiting_for_response;
-  auto cur_act = self.is_activated();
-  self.receive({
-    DefaultCodes::Response - [&](std::unique_ptr<MessageBody>& rep) {
-      try {
-        handlers.process_body(*rep);
-      } catch (...) {
-        std::throw_with_nested(ZAFException(
-          "Exception caught when processing a message with code ", rep->get_code(),
-          " (", std::hex, rep->get_code(), ")."));
-      }
-      self.deactivate();
-    },
-    DefaultCodes::DefaultMessageHandler - [&](Message&) {
-      self.pending_messages.push_back(self.current_message);
-      self.current_message = nullptr;
-    }
-  });
-  if (cur_act) {
-    self.activate();
+  if (!self) {
+    throw ZAFException("Attempt to call on_reply on an invalid RequestHandler.");
   }
-  --self.waiting_for_response;
+  auto iter = self->unfinished_requests.find(request_id);
+  if (iter->second) {
+    // 1. if the response has been received and stored, process it
+    handlers.process_body(*iter->second);
+    self->unfinished_requests.erase(iter);
+  } else {
+    // 2. if not, wait for the response
+    self->unfinished_requests.erase(iter);
+    ++self->waiting_for_response;
+    auto cur_act = self->is_activated();
+    auto current_inner_handlers = std::move(self->inner_handlers);
+    self->receive({
+      DefaultCodes::Response -
+      [&](unsigned req_id, std::unique_ptr<MessageBody>& rep) {
+        if (req_id != request_id) {
+          self->store_response(req_id, rep);
+          return;
+        }
+        try {
+          handlers.process_body(*rep);
+        } catch (...) {
+          std::throw_with_nested(ZAFException(
+            "Exception caught when processing a message with code ", rep->get_code(),
+            " (", std::hex, rep->get_code(), ")."));
+        }
+        self->deactivate();
+      },
+      DefaultCodes::DefaultMessageHandler - [&](Message&) {
+        self->pending_messages.push_back(self->current_message);
+        self->current_message = nullptr;
+      }
+    });
+    self->inner_handlers = std::move(current_inner_handlers);
+    if (cur_act) {
+      self->activate();
+    }
+    --self->waiting_for_response;
+  }
+  self = nullptr;
 }
 
 std::optional<std::chrono::milliseconds>
@@ -361,6 +427,20 @@ void ActorBehavior::flush_delayed_messages() {
       }
     }, msg.message);
     delayed_messages.erase(delayed_messages.begin());
+  }
+}
+
+void ActorBehavior::store_response(unsigned req_id,
+  std::unique_ptr<MessageBody>& response) {
+  // If there is a RequestHandler waiting for a response with this req_id,
+  // store this response for this RequestHandler
+  auto iter = unfinished_requests.find(req_id);
+  if (iter != unfinished_requests.end()) {
+    iter->second = std::move(response);
+  } else {
+    // Ignore the response.
+    // Request id not found because the RequestHandler has been destroyed
+    // before it processes the reply.
   }
 }
 } // namespace zaf

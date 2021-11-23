@@ -2,11 +2,17 @@
 
 namespace zaf {
 MessageHandlers::MessageHandlers(MessageHandlers&& other):
-  handlers(std::move(other.handlers)) {
+  handlers(std::move(other.handlers)),
+  default_handler(std::move(other.default_handler)),
+  child(other.child) {
+  other.child = nullptr;
 }
 
 MessageHandlers& MessageHandlers::operator=(MessageHandlers&& other) {
   this->handlers = std::move(other.handlers);
+  this->default_handler = std::move(other.default_handler);
+  this->child = other.child;
+  other.child = nullptr;
   return *this;
 }
 

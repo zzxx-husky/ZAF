@@ -47,6 +47,7 @@ GTEST_TEST(Request, ByResponse) {
       actor2.send(actor2.get_current_sender_actor(), 2, hw);
       std::reverse(hw.begin(), hw.end());
       actor2.send(actor2.get_current_sender_actor(), DefaultCodes::Response,
+        get_request_id(actor2.get_current_message()),
         std::unique_ptr<MessageBody>(new_message(Code{1}, hw)));
     }
   });
@@ -116,23 +117,26 @@ GTEST_TEST(Request, ByResponse2) {
   ActorSystem actor_system;
 
   auto a = actor_system.spawn([&](ActorBehavior& self) {
-    Actor requester;
+    CountPointer<Message> requester;
     Actor target;
     self.receive({
       Code{0} - [&]() {
         target = self.get_current_sender_actor(); 
         if (requester) {
-          self.send(requester, DefaultCodes::Response,
+          self.send(requester->get_sender(), DefaultCodes::Response,
+            get_request_id(*requester),
             std::unique_ptr<MessageBody>(new_message(Code{1}, target)));
           self.deactivate();
         }
       },
       Code{1} - [&]() {
-        requester = self.get_current_sender_actor();
         if (target) {
-          self.send(requester, DefaultCodes::Response,
+          self.send(self.get_current_sender_actor(), DefaultCodes::Response,
+            get_request_id(self.get_current_message()),
             std::unique_ptr<MessageBody>(new_message(Code{1}, target)));
           self.deactivate();
+        } else {
+          requester = std::move(self.take_current_message());
         }
       }
     });
@@ -158,6 +162,43 @@ GTEST_TEST(Request, ByResponse2) {
         self.reply(2, v * 2);
       }
     });
+  });
+}
+
+GTEST_TEST(Request, UnorderedRequest) {
+  ActorSystem actor_system;
+
+  auto a = actor_system.spawn([&](ActorBehavior& self) {
+    self.receive({
+      zaf::Code{0} - [&](int x) {
+        self.reply(0, x * 2);
+      },
+      zaf::Code{1} - [&]() {
+        self.deactivate();
+      }
+    });
+  });
+
+  auto b = actor_system.spawn([&](ActorBehavior& self) {
+    std::vector<ActorBehavior::RequestHandler> reqs;
+    for (int i = 0; i < 10; i++) {
+      reqs.emplace_back(self.request(a, 0, i));
+    }
+    self.send(a, 1);
+    for (int i = 1; i < 10; i += 2) {
+      reqs[i].on_reply({
+        zaf::Code{0} - [&](int r) {
+          EXPECT_EQ(r, i * 2);
+        }
+      });
+    }
+    for (int i = 0; i < 10; i += 2) {
+      reqs[i].on_reply({
+        zaf::Code{0} - [&](int r) {
+          EXPECT_EQ(r, i * 2);
+        }
+      });
+    }
   });
 }
 } // namespace zaf

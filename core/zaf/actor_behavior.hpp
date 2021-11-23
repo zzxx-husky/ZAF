@@ -8,6 +8,7 @@
 #include "actor.hpp"
 #include "count_pointer.hpp"
 #include "delayed_message.hpp"
+#include "macros.hpp"
 #include "make_message.hpp"
 #include "message_handlers.hpp"
 #include "zaf_exception.hpp"
@@ -36,28 +37,12 @@ public:
   // send a normal message to message sender
   template<typename ... ArgT>
   inline void reply(Code code, ArgT&& ... args) {
-    if (this->get_current_message().get_body().get_code() == DefaultCodes::Request) {
-      this->send(this->get_current_sender_actor(), DefaultCodes::Response,
-        std::unique_ptr<MessageBody>(
-          new_message(code, std::forward<ArgT>(args) ...)
-        ));
-    } else {
-      this->send(this->get_current_sender_actor(), code, std::forward<ArgT>(args)...);
-    }
+    this->reply(this->get_current_message(), code, std::forward<ArgT>(args) ...);
   }
 
   // reply a message to the sender of the `msg`
   template<typename ... ArgT>
-  inline void reply(Message& msg, Code code, ArgT&& ... args) {
-    if (msg.get_body().get_code() == DefaultCodes::Request) {
-      this->send(msg.get_sender(),
-        DefaultCodes::Response, std::unique_ptr<MessageBody>(
-          new_message(code, std::forward<ArgT>(args) ...)
-        ));
-    } else {
-      this->send(msg.get_sender(), code, std::forward<ArgT>(args)...);
-    }
-  }
+  void reply(const Message& msg, Code code, ArgT&& ... args);
 
   // send a message to a ActorBehavior
   template<typename ... ArgT>
@@ -122,26 +107,13 @@ public:
   void delayed_send(const std::chrono::duration<Rep, Period>& delay, const Actor& receiver,
     Code code, ArgT&& ... args);
 
-  struct RequestHandler {
-    ActorBehavior& self;
-    void on_reply(MessageHandlers&& handlers);
-    void on_reply(MessageHandlers& handlers);
-  };
-
-  template<typename Receiver, typename ... ArgT>
-  inline RequestHandler request(Receiver&& receiver, Code code, ArgT&& ... args) {
-    this->send(receiver, DefaultCodes::Request, std::unique_ptr<MessageBody>(
-      new_message(code, std::forward<ArgT>(args) ...)
-    ));
-    return {*this};
-  }
-
   ActorSystem& get_actor_system();
   ActorGroup& get_actor_group();
   Actor get_self_actor();
   Actor get_current_sender_actor() const;
 
   CountPointer<Message> take_current_message();
+  Message& get_current_message();
   const Message& get_current_message() const;
 
   void activate();
@@ -192,10 +164,6 @@ protected:
   bool activated = false;
   Message* current_message = nullptr;
 
-  // to handle recursive request/response
-  unsigned waiting_for_response = 0;
-  std::deque<Message*> pending_messages;
-
   ActorIdType actor_id{~0u};
   zmq::socket_t send_socket, recv_socket;
   std::vector<zmq::pollitem_t> recv_poll_items;
@@ -203,8 +171,45 @@ protected:
   ActorSystem* actor_system_ptr = nullptr;
 
   MessageHandlers inner_handlers{}; // default: empty handlers
+
+public:
+  class RequestHandler {
+  private:
+    ActorBehavior* self = nullptr;
+    unsigned request_id;
+
+  public:
+    RequestHandler(ActorBehavior& self, unsigned req_id);
+    RequestHandler(const RequestHandler&) = delete;
+    RequestHandler(RequestHandler&&);
+    ~RequestHandler();
+
+    RequestHandler& operator=(const RequestHandler&) = delete;
+    RequestHandler& operator=(RequestHandler&&);
+
+    void on_reply(MessageHandlers&& handlers);
+    void on_reply(MessageHandlers& handlers);
+  };
+
+  template<typename Receiver, typename ... ArgT>
+  inline RequestHandler request(Receiver&& receiver, Code code, ArgT&& ... args) {
+    auto req_id = request_id++;
+    this->send(receiver, DefaultCodes::Request, req_id,
+      std::unique_ptr<MessageBody>(
+        new_message(code, std::forward<ArgT>(args) ...)
+      ));
+    return {*this, req_id};
+  }
+
+  void store_response(unsigned req_id, std::unique_ptr<MessageBody>& response);
+
+protected:
+  unsigned waiting_for_response = 0;
+  unsigned request_id = 0;
+  DefaultHashMap<unsigned, std::unique_ptr<MessageBody>> unfinished_requests;
+  std::deque<Message*> pending_messages;
 };
 } // namespace zaf
 
-#include "actor_behavior.tpp"
 #include "requester.hpp"
+#include "actor_behavior.tpp"
