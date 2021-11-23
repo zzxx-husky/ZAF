@@ -12,9 +12,9 @@ namespace zaf {
 // Store the type-erased user-defined message handler
 struct MessageHandler {
   virtual void process(Message& m);
-  virtual void process(MessageBody& body);
-  virtual void process(MemoryMessageBody& body) = 0;
-  virtual void process(SerializedMessageBody& body) = 0;
+  virtual void process_body(MessageBody& body);
+  virtual void process_body(MemoryMessageBody& body) = 0;
+  virtual void process_body(SerializedMessageBody& body) = 0;
 
   virtual ~MessageHandler() = default;
 };
@@ -34,15 +34,15 @@ public:
     handler(m);
   }
 
-  void process(MessageBody& body) override {
+  void process_body(MessageBody& body) override {
     throw ZAFException("RawMessageHandler does not process MessageBody.");
   }
 
-  void process(MemoryMessageBody& body) override {
+  void process_body(MemoryMessageBody& body) override {
     throw ZAFException("RawMessageHandler does not process MemoryMessageBody.");
   }
 
-  void process(SerializedMessageBody& body) override {
+  void process_body(SerializedMessageBody& body) override {
     throw ZAFException("RawMessageHandler does not process SerializedMessageBody.");
   }
 };
@@ -66,7 +66,7 @@ public:
 
   // recover the types of the arguments in the message
   // then forward the arguments into the handler
-  void process(MemoryMessageBody& body) override {
+  void process_body(MemoryMessageBody& body) override {
     if (body.get_type_hash_code() != ArgTypes::hash_code()) {
       throw ZAFException("The hash code of the message content types does not"
         " match with the argument types of the message handler.",
@@ -75,10 +75,10 @@ public:
     }
     // no `auto` is allowed in the argument type, otherwise we need to
     // match the lambda with arguments in compile time.
-    process(body, std::make_index_sequence<ArgTypes::size>());
+    process_body(body, std::make_index_sequence<ArgTypes::size>());
   }
 
-  void process(SerializedMessageBody& body) override {
+  void process_body(SerializedMessageBody& body) override {
     if (body.get_type_hash_code() != ArgTypes::hash_code()) {
       throw ZAFException("The hash code of the message content types does not"
         " match with the argument types of the message handler.",
@@ -88,7 +88,7 @@ public:
     // no `auto` is allowed in the argument type, otherwise we need to
     // match the lambda with arguments in compile time.
     if constexpr (traits::all_handler_arguments_serializable<ArgTypes>::value) {
-      process(body, std::make_index_sequence<ArgTypes::size>());
+      process_body(body, std::make_index_sequence<ArgTypes::size>());
     } else {
       throw ZAFException("The TypedMessageHandler contains non-serializable"
         " argument(s) but receives a serialized message.");
@@ -96,7 +96,7 @@ public:
   }
 
   template<size_t ... I>
-  inline void process(MemoryMessageBody& m, std::index_sequence<I ...>) {
+  inline void process_body(MemoryMessageBody& m, std::index_sequence<I ...>) {
     m.get_element_ptrs(message_element_addrs);
     try {
       handler(
@@ -115,7 +115,7 @@ public:
   }
 
   template<size_t ... I>
-  inline void process(SerializedMessageBody& m, std::index_sequence<I ...>) {
+  inline void process_body(SerializedMessageBody& m, std::index_sequence<I ...>) {
     auto&& content = m.deserialize_content<ArgTypes>();
     try {
       handler(

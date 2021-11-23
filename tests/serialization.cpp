@@ -212,7 +212,7 @@ GTEST_TEST(SerializedMessage, MessageInMessage) {
   };
   MessageHandlers outer_handlers = {
     Code{100} - [&](std::unique_ptr<MessageBody>& m) {
-      handlers.process(*m);
+      handlers.process_body(*m);
     }
   };
   {

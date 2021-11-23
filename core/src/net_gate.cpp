@@ -47,14 +47,13 @@ void NetGate::Receiver::receive_once_from_net() {
     auto num_bytes = deserialize<unsigned>(s);
     auto bytes = std::vector<char>(num_bytes);
     s.read_bytes(&bytes.front(), num_bytes);
-    auto message = new Message();
-    message->set_sender(Actor{RemoteActorHandle{net_sender_info, send_actor}});
-    message->set_body(std::make_unique<TypedSerializedMessageBody<std::vector<char>>>(
+    auto msg = new TypedMessage<TypedSerializedMessageBody<std::vector<char>>>(
+      Actor{RemoteActorHandle{net_sender_info, send_actor}},
       message_code,
       types_hash,
       std::move(bytes)
-    ));
-    this->send(recv_actor, message);
+    );
+    this->send(recv_actor, msg);
   }
 }
 
@@ -325,15 +324,14 @@ void NetGate::NetGateActor::receive_once_from_net_gate(MessageHandlers& handlers
   auto msg_code = deserialize<size_t>(s);
   // not reading msg_type here because it only receives Message::Type::Normal messages
   auto types_hash = deserialize<size_t>(s);
-  Message message;
-  message.set_sender(Actor{});
-  message.set_body(std::make_unique<TypedSerializedMessageBody<zmq::message_t>>(
+  TypedMessage<TypedSerializedMessageBody<zmq::message_t>> msg{
+    Actor{},
     msg_code,
     types_hash,
     std::move(msg_bytes),
     sizeof(size_t) + sizeof(size_t)
-  ));
-  handlers.process(message);
+  };
+  handlers.process(msg);
 }
 
 void NetGate::NetGateActor::ping_net_gate(const std::string& ng_url) {

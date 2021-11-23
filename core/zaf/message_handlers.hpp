@@ -16,10 +16,10 @@ public:
   MessageHandlers& operator=(MessageHandlers&& other);
 
   bool try_process(Message& m);
-  bool try_process(MessageBody& m);
+  bool try_process_body(MessageBody& m);
 
   void process(Message& m);
-  void process(MessageBody& m);
+  void process_body(MessageBody& m);
 
   template<typename CodeHandler, typename ... ArgT>
   void add_handlers(CodeHandler&& code_handler, ArgT&& ... args) {

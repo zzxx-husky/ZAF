@@ -10,13 +10,13 @@ MessageHandlers& MessageHandlers::operator=(MessageHandlers&& other) {
   return *this;
 }
 
-bool MessageHandlers::try_process(MessageBody& body) {
+bool MessageHandlers::try_process_body(MessageBody& body) {
   auto iter = handlers.find(body.get_code());
   if (iter != handlers.end()) {
-    iter->second->process(body);
+    iter->second->process_body(body);
     return true;
   }
-  if (this->child && this->child->try_process(body)) {
+  if (this->child && this->child->try_process_body(body)) {
     return true;
   }
   return false;
@@ -25,7 +25,7 @@ bool MessageHandlers::try_process(MessageBody& body) {
 bool MessageHandlers::try_process(Message& m) {
   auto iter = handlers.find(m.get_body().get_code());
   if (iter != handlers.end()) {
-    iter->second->process(m.get_body());
+    iter->second->process_body(m.get_body());
     return true;
   }
   if (this->child && this->child->try_process(m)) {
@@ -38,8 +38,8 @@ bool MessageHandlers::try_process(Message& m) {
   return false;
 }
 
-void MessageHandlers::process(MessageBody& body) {
-  if (!try_process(body)) {
+void MessageHandlers::process_body(MessageBody& body) {
+  if (!try_process_body(body)) {
     throw ZAFException(
       "Handler for code ", body.get_code(), " not found."
     );

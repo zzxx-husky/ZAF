@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 
+#include "zaf/make_message.hpp"
 #include "zaf/message_handlers.hpp"
 
 #include "gtest/gtest.h"

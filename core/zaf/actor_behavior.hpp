@@ -6,6 +6,9 @@
 #include <utility>
 
 #include "actor.hpp"
+#include "count_pointer.hpp"
+#include "delayed_message.hpp"
+#include "make_message.hpp"
 #include "message_handlers.hpp"
 #include "zaf_exception.hpp"
 
@@ -16,74 +19,11 @@ class ActorSystem;
 class ActorGroup;
 class ActorBehavior;
 
-// make all `send` invocations to `request`
-class Requester {
-public:
-  ActorBehavior& self;
-
-  template<typename ... ArgT>
-  decltype(auto) send(ArgT&& ... args);
-
-  template<typename ... ArgT>
-  decltype(auto) request(ArgT&& ... args);
-};
-
 class ActorBehavior {
 protected:
   using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 public:
-  struct MessageBytes {
-    std::vector<char> header;
-    std::vector<char> content;
-
-    MessageBytes() = default;
-    MessageBytes(const MessageBytes&) = delete;
-    MessageBytes(MessageBytes&&) = default;
-    MessageBytes& operator=(const MessageBytes&) = delete;
-    MessageBytes& operator=(MessageBytes&&) = default;
-
-    template<typename ... ArgT>
-    static MessageBytes make(const LocalActorHandle& send, const LocalActorHandle& recv,
-      Code code, ArgT&& ... args) {
-      MessageBytes bytes;
-      bytes.header.reserve(
-        LocalActorHandle::SerializationSize +
-        LocalActorHandle::SerializationSize +
-        sizeof(code) +
-        sizeof(size_t) +
-        sizeof(unsigned)
-      );
-      Serializer(bytes.header)
-        .write(send)
-        .write(recv)
-        .write(code)
-        .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...));
-      Serializer(bytes.content)
-        .write(std::forward<ArgT>(args) ...);
-      Serializer(bytes.header)
-        .write(static_cast<unsigned>(bytes.content.size()));
-      return bytes;
-    }
-  };
-
-  struct DelayedMessage {
-    Actor receiver;
-    std::variant<
-      Message*,
-      MessageBytes
-    > message;
-
-    DelayedMessage(const Actor& r, Message* m);
-    DelayedMessage(const Actor& r, MessageBytes&& m);
-    DelayedMessage(const DelayedMessage&) = delete;
-    DelayedMessage(DelayedMessage&&);
-    DelayedMessage& operator=(const DelayedMessage&) = delete;
-    DelayedMessage& operator=(DelayedMessage&&);
-
-    ~DelayedMessage();
-  };
-
   ActorBehavior();
 
   /**
@@ -201,7 +141,7 @@ public:
   Actor get_self_actor();
   Actor get_current_sender_actor() const;
 
-  Message take_current_message();
+  CountPointer<Message> take_current_message();
   const Message& get_current_message() const;
 
   void activate();
@@ -264,16 +204,7 @@ protected:
 
   MessageHandlers inner_handlers{}; // default: empty handlers
 };
-
-template<typename ... ArgT>
-decltype(auto) Requester::send(ArgT&& ... args) {
-  return self.request(std::forward<ArgT>(args) ...);
-}
-
-template<typename ... ArgT>
-decltype(auto) Requester::request(ArgT&& ... args) {
-  return self.request(std::forward<ArgT>(args) ...);
-}
 } // namespace zaf
 
 #include "actor_behavior.tpp"
+#include "requester.hpp"

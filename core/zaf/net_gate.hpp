@@ -155,7 +155,7 @@ private:
       // remote actor name -> request message (which contains the requesters)
       std::unordered_map<
         std::string,
-        std::vector<Message>
+        std::vector<CountPointer<Message>>
       > actor_lookup_requesters;
       // a buffer storing messages that are pending and waiting for the `pong` message from peer net gate
       std::vector<zmq::message_t> pending_messages;

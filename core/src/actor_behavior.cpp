@@ -4,59 +4,10 @@
 #include "zaf/zaf_exception.hpp"
 
 namespace zaf {
-ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, Message* m):
-  receiver(r),
-  message(m) {
-}
-
-ActorBehavior::DelayedMessage::DelayedMessage(const Actor& r, MessageBytes&& m):
-  receiver(r),
-  message(std::move(m)) {
-}
-
-ActorBehavior::DelayedMessage::DelayedMessage(ActorBehavior::DelayedMessage&& m):
-  receiver(std::move(m.receiver)) {
-  std::visit(overloaded {
-    [&](Message*& msg) {
-      this->message = msg;
-      msg = nullptr;
-    },
-    [&](MessageBytes& bytes) {
-      this->message = std::move(bytes);
-    }
-  }, m.message);
-}
-
-ActorBehavior::DelayedMessage&
-ActorBehavior::DelayedMessage::operator=(ActorBehavior::DelayedMessage&& m) {
-  this->receiver = std::move(m.receiver);
-  std::visit(overloaded {
-    [&](Message*& msg) {
-      this->message = msg;
-      msg = nullptr;
-    },
-    [&](MessageBytes& bytes) {
-      this->message = std::move(bytes);
-    }
-  }, m.message);
-  return *this;
-}
-
-ActorBehavior::DelayedMessage::~DelayedMessage() {
-  std::visit(overloaded {
-    [&](Message* m) {
-      if (m) {
-        delete m;
-      }
-    },
-    [&](auto&&) {}
-  }, message);
-}
-
 ActorBehavior::ActorBehavior() {
   inner_handlers.add_handlers(
     DefaultCodes::Request - [&](std::unique_ptr<MessageBody>& request) {
-      inner_handlers.process(*request);
+      inner_handlers.process_body(*request);
     }
   );
 }
@@ -79,11 +30,13 @@ Actor ActorBehavior::get_self_actor() {
   return Actor{get_local_actor_handle()};
 }
 
-Message ActorBehavior::take_current_message() {
+CountPointer<Message> ActorBehavior::take_current_message() {
   if (!this->current_message) {
     throw ZAFException("Attempt to take null message.");
   }
-  return std::move(*this->current_message);
+  CountPointer<Message> ptr{this->current_message};
+  this->current_message = nullptr;
+  return ptr;
 }
 
 const Message& ActorBehavior::get_current_message() const {
@@ -363,7 +316,7 @@ void ActorBehavior::RequestHandler::on_reply(MessageHandlers& handlers) {
   self.receive({
     DefaultCodes::Response - [&](std::unique_ptr<MessageBody>& rep) {
       try {
-        handlers.process(*rep);
+        handlers.process_body(*rep);
       } catch (...) {
         std::throw_with_nested(ZAFException(
           "Exception caught when processing a message with code ", rep->get_code(),
