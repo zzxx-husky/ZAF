@@ -9,38 +9,63 @@ namespace zaf {
 template<typename T>
 class CountPointer {
 public:
+  // same as null pointer
+  CountPointer() = default;
+
   // Initizalize with an existing pointer
-  CountPointer(T* ptr = nullptr) {
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer(U* ptr) {
     if (ptr) {
       value = ptr;
       count = new unsigned(1);
     }
   }
 
-  // Construct a new pointer
-  template<typename ... ArgT>
-  explicit CountPointer(ArgT&& ... args):
-    value(new T(std::forward<ArgT>(args)...)),
-    count(new unsigned(1)) {
+  CountPointer(std::nullptr_t) {
+    /* do nothing */
   }
 
-  CountPointer(const CountPointer<T>& ptr) :
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer(const CountPointer<U>& ptr):
     value(ptr.value),
     count(ptr.count),
     destructor(ptr.destructor) {
     inc_count();
   }
 
-  explicit CountPointer(CountPointer<T>&& ptr) :
+  CountPointer(const CountPointer<T>& ptr):
     value(ptr.value),
     count(ptr.count),
     destructor(ptr.destructor) {
     inc_count();
-    ptr = nullptr;
+  }
+
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer(CountPointer<U>&& ptr) :
+    value(ptr.value),
+    count(ptr.count),
+    destructor(ptr.destructor) {
+    ptr.value = nullptr;
+    ptr.count = nullptr;
+    ptr.destructor = nullptr;
+  }
+
+  CountPointer(CountPointer<T>&& ptr) :
+    value(ptr.value),
+    count(ptr.count),
+    destructor(ptr.destructor) {
+    ptr.value = nullptr;
+    ptr.count = nullptr;
+    ptr.destructor = nullptr;
   }
 
   // give up the old one and create a new pointer
-  CountPointer<T>& operator=(T* ptr) {
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer<T>& operator=(U* ptr) {
     dec_count();
     if (ptr) {
       count = new unsigned(1);
@@ -48,6 +73,20 @@ public:
     } else {
       count = nullptr;
       value = nullptr;
+    }
+    destructor = nullptr;
+    return *this;
+  }
+
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer<T>& operator=(const CountPointer<U>& ptr) {
+    if (count != ptr.count) {
+      dec_count();
+      count = ptr.count;
+      value = ptr.value;
+      destructor = ptr.destructor;
+      inc_count();
     }
     return *this;
   }
@@ -63,16 +102,45 @@ public:
     return *this;
   }
 
-  CountPointer<T>& operator=(CountPointer<T>&& ptr) {
+  template<typename U,
+    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+  CountPointer<T>& operator=(CountPointer<U>&& ptr) {
+    if (this == &ptr) {
+      return *this;
+    }
+    dec_count();
     if (count != ptr.count) {
-      dec_count();
       count = ptr.count;
       value = ptr.value;
       destructor = ptr.destructor;
-      ptr.count = nullptr;
-      ptr.value = nullptr;
-      ptr.destructor = nullptr;
     }
+    ptr.count = nullptr;
+    ptr.value = nullptr;
+    ptr.destructor = nullptr;
+    return *this;
+  }
+
+  CountPointer<T>& operator=(CountPointer<T>&& ptr) {
+    if (this == &ptr) {
+      return *this;
+    }
+    dec_count();
+    if (count != ptr.count) {
+      count = ptr.count;
+      value = ptr.value;
+      destructor = ptr.destructor;
+    }
+    ptr.count = nullptr;
+    ptr.value = nullptr;
+    ptr.destructor = nullptr;
+    return *this;
+  }
+
+  CountPointer<T>& operator=(std::nullptr_t) {
+    dec_count();
+    count = nullptr;
+    value = nullptr;
+    destructor = nullptr;
     return *this;
   }
 
@@ -100,16 +168,8 @@ public:
     return value;
   }
 
-  explicit operator bool() const {
+  operator bool() const {
     return value != nullptr;
-  }
-
-  operator T&() {
-    return *value;
-  }
-
-  operator const T&() const {
-    return *value;
   }
 
   ~CountPointer() {
@@ -153,6 +213,6 @@ protected:
 
 template<typename T, typename ... ArgT>
 CountPointer<T> make_count(ArgT&& ... args) {
-  return {std::forward<ArgT>(args) ...};
+  return {new T(std::forward<ArgT>(args) ...)};
 }
 } // namespace zaf 

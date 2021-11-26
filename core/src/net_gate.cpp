@@ -265,7 +265,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
       auto iter = requesters.find(name);
       Actor actor{RemoteActorHandle{conn.net_sender_info, remote_actor}};
       for (auto& i : iter->second) {
-        this->reply(i, ActorLookupRep, peer, name, actor);
+        this->reply(*i, ActorLookupRep, peer, name, actor);
       }
       requesters.erase(iter);
     },

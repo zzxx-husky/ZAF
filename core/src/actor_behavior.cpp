@@ -214,12 +214,12 @@ void ActorBehavior::initialize_actor(ActorSystem& sys, ActorGroup& group) {
   if (bool(actor_system_ptr)) {
     throw ZAFException("Actor is initialized twice. Existing actor id: ", this->actor_id);
   }
+  actor_system_ptr = &sys;
+  actor_group_ptr = &group;
+  sys.inc_num_alive_actors();
+  this->actor_id = sys.get_next_available_actor_id();
+  this->initialize_routing_id_buffer();
   try {
-    actor_system_ptr = &sys;
-    actor_group_ptr = &group;
-    sys.inc_num_alive_actors();
-    this->actor_id = sys.get_next_available_actor_id();
-    this->initialize_routing_id_buffer();
     this->initialize_recv_socket();
     this->initialize_send_socket();
   } catch (...) {
