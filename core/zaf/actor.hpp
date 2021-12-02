@@ -15,7 +15,8 @@ struct LocalActorHandle {
   LocalActorHandle& operator=(const LocalActorHandle&) = default;
 
   LocalActorHandle(ActorIdType id, bool use_swsr);
-  operator bool() const;
+  // to avoid LocalActorHandle is converted to bool and then to other numeric types implicitly
+  explicit operator bool() const;
   friend bool operator==(const LocalActorHandle&, const LocalActorHandle&);
   size_t hash_code() const;
   friend std::ostream& operator<<(std::ostream&, const LocalActorHandle&);
@@ -43,7 +44,8 @@ struct RemoteActorHandle {
   RemoteActorHandle& operator=(const RemoteActorHandle&) = default;
 
   RemoteActorHandle(const NetSenderInfo&, const LocalActorHandle&);
-  operator bool() const;
+  // to avoid RemoteActorHandle is converted to bool and then to other numeric types implicitly
+  explicit operator bool() const;
   friend bool operator==(const RemoteActorHandle& a, const RemoteActorHandle& b);
   size_t hash_code() const;
   friend std::ostream& operator<<(std::ostream&, const RemoteActorHandle&);

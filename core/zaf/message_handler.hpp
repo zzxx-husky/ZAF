@@ -109,7 +109,8 @@ public:
     } catch (...) {
       std::throw_with_nested(ZAFException(
         "Exception caught in ", __PRETTY_FUNCTION__,
-        " when handling typed message with code ", m.get_code()
+        " when handling typed message with code ", m.get_code(),
+        " (", std::hex, m.get_code(), ")."
       ));
     }
   }
@@ -126,7 +127,8 @@ public:
     } catch (...) {
       std::throw_with_nested(ZAFException(
         "Exception caught in ", __PRETTY_FUNCTION__,
-        " when handling serialized message with code ", m.get_code()
+        " when handling serialized message with code ", m.get_code(),
+        " (", std::hex, m.get_code(), ")."
       ));
     }
   }
