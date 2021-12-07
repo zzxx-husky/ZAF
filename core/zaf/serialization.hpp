@@ -3,6 +3,7 @@
 #include <optional>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <type_traits>
 
 #include "actor.hpp"
@@ -261,6 +262,27 @@ void serialize(Serializer& s, const std::shared_ptr<T>& ptr) {
   } else {
     s.write(false);
   }
+}
+
+template<typename ... ArgT,
+  typename std::enable_if_t<traits::all_serializable<ArgT ...>::value>* = nullptr>
+void serialize(Serializer& s, const std::tuple<ArgT ...>& t) {
+  serialize(s, t, std::make_index_sequence<std::tuple_size_v<std::tuple<ArgT ...>>>{});
+}
+
+template<typename ... ArgT, size_t ... I>
+void serialize(Serializer& s, const std::tuple<ArgT ...>& t, std::index_sequence<I ...>) {
+  s.write(std::get<I>(t) ...);
+}
+
+template<typename ... ArgT>
+void deserialize(Deserializer& s, std::tuple<ArgT ...>& t) {
+  deserialize(s, t, std::make_index_sequence<std::tuple_size_v<std::tuple<ArgT ...>>>{});
+}
+
+template<typename ... ArgT, size_t ... I>
+void deserialize(Deserializer& s, std::tuple<ArgT ...>& t, std::index_sequence<I ...>) {
+  s.read(std::get<I>(t) ...);
 }
 
 void serialize(Serializer& s, const LocalActorHandle& l);

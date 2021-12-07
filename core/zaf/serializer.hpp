@@ -56,12 +56,22 @@ public:
   template<typename T>
   T read();
 
+  Deserializer& read();
+
   template<typename T>
   Deserializer& read(T& t);
+
+  template<typename T, typename ... Ts>
+  Deserializer& read(T& t, Ts&& ... ts);
 
 private:
   const char* offset;
 };
+
+namespace traits {
+template<typename ... ArgT>
+struct all_serializable;
+} // namespace traits
 } // namespace zaf
 
 #include "serialization.hpp"
@@ -70,8 +80,7 @@ namespace zaf {
 template<typename T, typename ... Ts>
 Serializer& Serializer::write(T&& t, Ts&& ... ts) {
   serialize(*this, std::forward<T>(t));
-  write(std::forward<Ts>(ts)...);
-  return *this;
+  return write(std::forward<Ts>(ts)...);
 }
 
 template<typename T>
@@ -83,6 +92,12 @@ template<typename T>
 Deserializer& Deserializer::read(T& t) {
   deserialize(*this, t);
   return *this;
+}
+
+template<typename T, typename ... Ts>
+Deserializer& Deserializer::read(T& t, Ts&& ... ts) {
+  deserialize(*this, t);
+  return read(std::forward<Ts>(ts) ...);
 }
 
 namespace traits {
@@ -128,9 +143,12 @@ struct NonSerializableAnalyzer<Arg, ArgT ...> {
 };
 
 template<typename ... ArgT>
-using all_serializable = std::integral_constant<bool,
-  sizeof...(ArgT) == 0 || (std::conjunction_v<traits::is_savable<ArgT> ...> && std::conjunction_v<traits::is_loadable<ArgT>...>)
->;
+struct all_serializable: std::integral_constant<bool,
+  sizeof...(ArgT) == 0 || (
+    std::conjunction_v<traits::is_savable<ArgT> ...> &&
+    std::conjunction_v<traits::is_loadable<ArgT>...>
+  )
+> {};
 
 namespace impl {
 template<typename>

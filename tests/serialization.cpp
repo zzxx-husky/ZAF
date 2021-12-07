@@ -64,6 +64,8 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_FALSE(traits::all_serializable<std::unique_ptr<Z>>::value);
   EXPECT_FALSE(traits::all_serializable<std::shared_ptr<Z>>::value);
   EXPECT_FALSE(traits::all_serializable<CountPointer<Z>>::value);
+  EXPECT_TRUE((traits::all_serializable<std::tuple<>, std::tuple<X>, std::tuple<int>>::value));
+  EXPECT_FALSE((traits::all_serializable<std::tuple<Z>, std::tuple<Z*>>::value));
   // Actor
   EXPECT_TRUE((traits::all_serializable<ActorInfo>::value));
   EXPECT_FALSE((traits::all_serializable<Actor>::value));
@@ -247,6 +249,27 @@ GTEST_TEST(SerializedMessage, MessageInMessage) {
       std::unique_ptr<MessageBody>(new_message(1, std::vector<int>{1,2,3,4,5})));
     auto s = make_serialized_message(m);
     outer_handlers.process(s);
+  }
+}
+
+GTEST_TEST(SerializedMessage, Tuple) {
+  {
+    std::vector<char> bytes;
+    Serializer s(bytes);
+    auto a = std::make_tuple(1, 2, 3);
+    s.write(a);
+    Deserializer d(bytes);
+    auto b = d.read<std::tuple<int, int, int>>();
+    EXPECT_EQ(a, b);
+  }
+  {
+    std::vector<char> bytes;
+    Serializer s(bytes);
+    auto a = std::make_tuple();
+    s.write(a);
+    Deserializer d(bytes);
+    auto b = d.read<std::tuple<>>();
+    EXPECT_EQ(a, b);
   }
 }
 } // namespace zaf

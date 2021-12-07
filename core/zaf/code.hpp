@@ -10,7 +10,7 @@ struct Code {
   Code() = default;
   constexpr Code(size_t value) : value(value) {}
 
-  inline operator size_t() const {
+  inline constexpr operator size_t() const {
     return value;
   }
 };

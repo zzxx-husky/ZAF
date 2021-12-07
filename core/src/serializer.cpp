@@ -54,4 +54,8 @@ Deserializer::Deserializer(const char* off):
 Deserializer::Deserializer(const std::vector<char>& bytes):
   offset(&bytes.front()) {
 }
+
+Deserializer& Deserializer::read() {
+  return *this;
+}
 } // namespace zaf
