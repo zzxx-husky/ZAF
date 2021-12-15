@@ -25,18 +25,32 @@ MessageHandlers NetGate::Receiver::behavior() {
 
 void NetGate::Receiver::receive_once_from_net() {
   zmq::message_t message;
-  if (!net_recv_socket.recv(message)) {
-    throw ZAFException(
-      "Failed to receive message (number of messages) as expected at ",
-      __PRETTY_FUNCTION__
-    );
+  while (true) {
+    try {
+      if (!net_recv_socket.recv(message)) {
+        throw ZAFException(
+          "Failed to receive message (number of messages) as expected at ",
+          __PRETTY_FUNCTION__
+        );
+      }
+      break;
+    } catch (const zmq::error_t& e) {
+      if (e.num() != EINTR) { throw; }
+    }
   }
   unsigned num_messages = *message.data<unsigned>();
-  if (!net_recv_socket.recv(message)) {
-    throw ZAFException(
-      "Failed to receive message (message bytes) as expected at ",
-      __PRETTY_FUNCTION__
-    );
+  while (true) {
+    try {
+      if (!net_recv_socket.recv(message)) {
+        throw ZAFException(
+          "Failed to receive message (message bytes) as expected at ",
+          __PRETTY_FUNCTION__
+        );
+      }
+      break;
+    } catch (const zmq::error_t& e) {
+      if (e.num() != EINTR) { throw; }
+    }
   }
   Deserializer s(message.data<char>());
   for (unsigned i = 0; i < num_messages; i++) {
@@ -313,12 +327,24 @@ MessageHandlers NetGate::NetGateActor::behavior() {
 
 // handle messages from peer NetGateActor
 void NetGate::NetGateActor::receive_once_from_net_gate(MessageHandlers& handlers) {
-  if (!net_recv_socket.recv(current_net_gate_routing_id, zmq::recv_flags::none)) {
+  try {
+    if (!net_recv_socket.recv(current_net_gate_routing_id, zmq::recv_flags::none)) {
+      return;
+    }
+  } catch (const zmq::error_t& e) {
+    if (e.num() != EINTR) { throw; }
     return;
   }
   zmq::message_t msg_bytes;
-  if (!net_recv_socket.recv(msg_bytes, zmq::recv_flags::none)) {
-    throw ZAFException("Receive empty message from ", current_net_gate_routing_id);
+  while (true) {
+    try {
+      if (!net_recv_socket.recv(msg_bytes, zmq::recv_flags::none)) {
+        throw ZAFException("Receive empty message from ", current_net_gate_routing_id);
+      }
+      break;
+    } catch (const zmq::error_t& e) {
+      if (e.num() != EINTR) { throw; }
+    }
   }
   Deserializer s(msg_bytes.data<char>());
   auto msg_code = deserialize<size_t>(s);

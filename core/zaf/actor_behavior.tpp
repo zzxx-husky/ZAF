@@ -102,25 +102,52 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
     return true;
   }
   try {
+    try {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    int npoll = zmq::poll(&recv_poll_items.front(), recv_poll_items.size(), timeout);
+      int npoll = zmq::poll(&recv_poll_items.front(), recv_poll_items.size(), timeout);
 #pragma GCC diagnostic pop
-    if (npoll == 0) {
-      return false;
+      if (npoll == 0) {
+        return false;
+      }
+    } catch (const zmq::error_t& e) {
+      if (e.num() == EINTR) {
+        return false;
+      }
+      throw;
     }
-    zmq::message_t message_ptr, sender_routing_id;
-    // receive current sender routing id
-    if (!recv_socket.recv(sender_routing_id)) {
-      throw ZAFException("Expect to receive a message but actually receive nothing.");
+    zmq::message_t sender_routing_id;
+    while (true) {
+      // in case `recv` is broken by EINTR, retry
+      try {
+        // receive current sender routing id
+        if (!recv_socket.recv(sender_routing_id)) {
+          throw ZAFException("Expect to receive a message but actually receive nothing.");
+        }
+        break;
+      } catch (const zmq::error_t& e) {
+        if (e.num() != EINTR) {
+          throw;
+        }
+      }
     }
-    if (!recv_socket.recv(message_ptr)) {
-      throw ZAFException(
-        "Failed to receive a message after receiving an routing id at ", __PRETTY_FUNCTION__
-      );
+    zmq::message_t message_ptr;
+    while (true) {
+      // in case `recv` is broken by EINTR, retry
+      try {
+        if (!recv_socket.recv(message_ptr)) {
+          throw ZAFException(
+            "Failed to receive a message after receiving an routing id at ", __PRETTY_FUNCTION__
+          );
+        }
+        callback(*reinterpret_cast<Message**>(message_ptr.data()));
+        return true;
+      } catch (const zmq::error_t& e) {
+        if (e.num() != EINTR) {
+          throw;
+        }
+      }
     }
-    callback(*reinterpret_cast<Message**>(message_ptr.data()));
-    return true;
   } catch (...) {
     std::throw_with_nested(ZAFException(
       "Exception caught in ", __PRETTY_FUNCTION__, " in actor ", this->actor_id
