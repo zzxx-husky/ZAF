@@ -126,9 +126,7 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
         }
         break;
       } catch (const zmq::error_t& e) {
-        if (e.num() != EINTR) {
-          throw;
-        }
+        if (e.num() != EINTR) { throw; }
       }
     }
     zmq::message_t message_ptr;
@@ -143,9 +141,7 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
         callback(*reinterpret_cast<Message**>(message_ptr.data()));
         return true;
       } catch (const zmq::error_t& e) {
-        if (e.num() != EINTR) {
-          throw;
-        }
+        if (e.num() != EINTR) { throw; }
       }
     }
   } catch (...) {
