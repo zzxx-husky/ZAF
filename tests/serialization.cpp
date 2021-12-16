@@ -40,6 +40,7 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_FALSE((traits::all_serializable<Z, int, int, int, const char>::value));
   // Iterable
   EXPECT_TRUE(traits::all_serializable<std::vector<int>>::value);
+  EXPECT_TRUE(traits::all_serializable<std::vector<bool>>::value);
   EXPECT_TRUE(traits::all_serializable<std::deque<int>>::value);
   EXPECT_TRUE(traits::all_serializable<std::list<int>>::value);
   EXPECT_TRUE((traits::all_serializable<std::map<int, int>>::value));
@@ -84,6 +85,15 @@ GTEST_TEST(SerializedMessage, Basic) {
     s.write(a);
     Deserializer d(bytes);
     auto b = d.read<std::vector<int>>();
+    EXPECT_EQ(a, b);
+  }
+  {
+    std::vector<char> bytes;
+    Serializer s(bytes);
+    std::vector<bool> a = {0, 1, 0, 1, 0, 1};
+    s.write(a);
+    Deserializer d(bytes);
+    auto b = d.read<std::vector<bool>>();
     EXPECT_EQ(a, b);
   }
   {

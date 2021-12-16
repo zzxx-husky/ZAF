@@ -290,4 +290,7 @@ void deserialize(Deserializer& s, LocalActorHandle& l);
 
 void serialize(Serializer& s, const ActorInfo& a);
 void deserialize(Deserializer& s, ActorInfo& a);
+
+void serialize(Serializer& s, const std::vector<bool>& v);
+void deserialize(Deserializer& s, std::vector<bool>& v);
 } // namespace zaf
