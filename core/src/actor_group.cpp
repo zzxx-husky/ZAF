@@ -36,6 +36,7 @@ void ActorGroup::inc_num_alive_actors() {
 void ActorGroup::inc_num_detached_actors() {
   auto num_detached = num_detached_actors.fetch_add(1, std::memory_order_relaxed) + 1;
   if (num_detached == num_alive_actors.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> _(await_actors_done_mtx);
     this->alive_actors_done_cv.notify_one();
   }
 }
@@ -43,9 +44,11 @@ void ActorGroup::inc_num_detached_actors() {
 void ActorGroup::dec_num_alive_actors() {
   auto num_alive = num_alive_actors.fetch_sub(1, std::memory_order_relaxed) - 1;
   if (num_alive == num_detached_actors.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> _(await_actors_done_mtx);
     this->alive_actors_done_cv.notify_one();
   }
   if (num_alive == 0) {
+    std::lock_guard<std::mutex> _(await_actors_done_mtx);
     this->all_actors_done_cv.notify_one();
   }
 }

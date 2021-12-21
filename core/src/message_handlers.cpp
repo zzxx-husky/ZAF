@@ -55,7 +55,8 @@ void MessageHandlers::process_body(MessageBody& body) {
 void MessageHandlers::process(Message& m) {
   if (!try_process(m)) {
     throw ZAFException(
-      "Handler for code ", m.get_body().get_code(), " not found."
+      "Handler for code ", m.get_body().get_code(), " not found. "
+      "Message is from ", m.get_sender()
     );
   }
 }
