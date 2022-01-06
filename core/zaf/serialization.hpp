@@ -111,6 +111,7 @@ T deserialize(Deserializer& s) {
 
 // 3. Serialization for iterable, i.e., containers 
 template<typename Iterable,
+  std::enable_if_t<!std::is_pod_v<traits::remove_cvref_t<Iterable>>>* = nullptr,
   std::enable_if_t<traits::is_iterable<Iterable>::value>* = nullptr,
   typename E = traits::remove_cvref_t<decltype(*std::declval<Iterable&>().begin())>,
   std::enable_if_t<traits::is_savable<E>::value>* = nullptr>
@@ -122,6 +123,7 @@ void serialize(Serializer& s, Iterable&& i) {
 }
 
 template<typename Iterable,
+  std::enable_if_t<!std::is_pod_v<traits::remove_cvref_t<Iterable>>>* = nullptr,
   std::enable_if_t<traits::is_iterable<Iterable>::value>* = nullptr,
   typename E = traits::remove_cvref_t<decltype(*std::declval<Iterable&>().begin())>,
   std::enable_if_t<traits::is_loadable<E>::value>* = nullptr>

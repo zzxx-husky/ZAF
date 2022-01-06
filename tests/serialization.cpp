@@ -49,7 +49,7 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_TRUE(traits::all_serializable<std::unordered_set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<DefaultHashMap<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<DefaultHashSet<int>>::value);
-  EXPECT_FALSE((traits::all_serializable<std::array<int, 4>>::value));
+  EXPECT_TRUE((traits::all_serializable<std::array<int, 4>>::value));
   EXPECT_FALSE(traits::all_serializable<std::vector<Z>>::value);
   EXPECT_FALSE(traits::all_serializable<std::deque<Z>>::value);
   EXPECT_FALSE(traits::all_serializable<std::list<Z>>::value);
