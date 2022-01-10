@@ -88,11 +88,11 @@ file(WRITE ${CMAKE_BINARY_DIR}/zaf_dependencies
   "${ZAFDepsHeaders}\n"
   "${ZAFDepsSources}\n"
   "${ENABLE_PHMAP}\n"
+  "${ENABLE_TCMALLOC}\n"
 )
 
 # make install
 include_directories(core)
-set(ZAFHeaders ${CoreHeaders})
 add_library(zaf_static STATIC $<TARGET_OBJECTS:CoreObject>)
 add_library(zaf_shared SHARED $<TARGET_OBJECTS:CoreObject>)
 set_target_properties(zaf_static PROPERTIES

@@ -29,11 +29,12 @@ struct MessageBytes {
       sizeof(size_t) +
       sizeof(unsigned)
     );
+    const size_t type_hash = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
     Serializer(bytes.header)
       .write(send)
       .write(recv)
       .write(code)
-      .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...));
+      .write(type_hash);
     Serializer(bytes.content)
       .write(std::forward<ArgT>(args) ...);
     Serializer(bytes.header)

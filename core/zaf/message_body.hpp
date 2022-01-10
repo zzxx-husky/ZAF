@@ -63,7 +63,8 @@ public:
 
   template<typename ... ArgT>
   struct TypesHashCode<std::tuple<ArgT ...>> {
-    inline const static size_t value = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
+    inline const static size_t value =
+      hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
   };
 
   size_t get_type_hash_code() const override {

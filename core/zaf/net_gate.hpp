@@ -105,10 +105,11 @@ private:
     // send the data when the connection with the net gate peer at `ng_url` is stable
     template<typename ... ArgT>
     void send_to_net_gate(const std::string& ng_url, size_t msg_code, ArgT&& ... args) {
+      const size_t type_hash = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
-        .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
+        .write(type_hash)
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
       if (conn.is_ponged) {
@@ -123,10 +124,11 @@ private:
     // used to send Ping and Pong for checking stableness
     template<typename ... ArgT>
     void imme_send_to_net_gate(const std::string& ng_url, size_t msg_code, ArgT&& ... args) {
+      const size_t type_hash = hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...);
       std::vector<char> bytes;
       Serializer(bytes)
         .write(msg_code)
-        .write(hash_combine(typeid(std::decay_t<ArgT>).hash_code() ...))
+        .write(type_hash)
         .write(std::forward<ArgT>(args) ...);
       auto& conn = net_gate_connections.at(ng_url);
       net_send_socket.send(zmq::buffer(ng_url + "/r"), zmq::send_flags::sndmore);
