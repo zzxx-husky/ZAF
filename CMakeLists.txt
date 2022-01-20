@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 project(zaf VERSION 0.1.0 DESCRIPTION "ZMQ-based Actor Framework")
 
 if (POLICY CMP0074)
