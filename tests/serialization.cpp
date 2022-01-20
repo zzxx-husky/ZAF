@@ -19,10 +19,22 @@
 #include "gtest/gtest.h"
 
 namespace zaf {
+struct X {};
+struct Y { int a; };
+struct Z { private: std::string b; };
+} // namespace zaf
+
+namespace std {
+template<>
+struct hash<zaf::Z> {
+  inline size_t operator()(const zaf::Z&) const {
+    return 0;
+  }
+};
+} // namespace std
+
+namespace zaf {
 GTEST_TEST(SerializedMessage, Traits) {
-  struct X {};
-  struct Y { int a; };
-  struct Z { private: std::string b; };
   // POD or basic types
   EXPECT_TRUE(traits::all_serializable<>::value);
   EXPECT_TRUE(traits::all_serializable<int>::value);
