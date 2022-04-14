@@ -1,4 +1,5 @@
 #include "zaf/net_gate.hpp"
+#include "zaf/receive_guard.hpp"
 #include "zaf/thread_utils.hpp"
 
 namespace zaf {
@@ -25,33 +26,23 @@ MessageHandlers NetGate::Receiver::behavior() {
 
 void NetGate::Receiver::receive_once_from_net() {
   zmq::message_t message;
-  while (true) {
-    try {
-      if (!net_recv_socket.recv(message)) {
-        throw ZAFException(
-          "Failed to receive message (number of messages) as expected at ",
-          __PRETTY_FUNCTION__
-        );
-      }
-      break;
-    } catch (const zmq::error_t& e) {
-      if (e.num() != EINTR) { throw; }
+  receive_guard([&]() {
+    if (!net_recv_socket.recv(message)) {
+      throw ZAFException(
+        "Failed to receive message (number of messages) as expected at ",
+        __PRETTY_FUNCTION__
+      );
     }
-  }
+  });
   unsigned num_messages = *message.data<unsigned>();
-  while (true) {
-    try {
-      if (!net_recv_socket.recv(message)) {
-        throw ZAFException(
-          "Failed to receive message (message bytes) as expected at ",
-          __PRETTY_FUNCTION__
-        );
-      }
-      break;
-    } catch (const zmq::error_t& e) {
-      if (e.num() != EINTR) { throw; }
+  receive_guard([&]() {
+    if (!net_recv_socket.recv(message)) {
+      throw ZAFException(
+        "Failed to receive message (message bytes) as expected at ",
+        __PRETTY_FUNCTION__
+      );
     }
-  }
+  });
   Deserializer s(message.data<char>());
   for (unsigned i = 0; i < num_messages; i++) {
     auto send_actor = deserialize<LocalActorHandle>(s);
@@ -327,25 +318,17 @@ MessageHandlers NetGate::NetGateActor::behavior() {
 
 // handle messages from peer NetGateActor
 void NetGate::NetGateActor::receive_once_from_net_gate(MessageHandlers& handlers) {
-  try {
-    if (!net_recv_socket.recv(current_net_gate_routing_id, zmq::recv_flags::none)) {
-      return;
-    }
-  } catch (const zmq::error_t& e) {
-    if (e.num() != EINTR) { throw; }
+  if (bool succ = false; !try_receive_guard([&]() {
+    succ = bool(net_recv_socket.recv(current_net_gate_routing_id, zmq::recv_flags::none));
+  }) || !succ) {
     return;
   }
   zmq::message_t msg_bytes;
-  while (true) {
-    try {
-      if (!net_recv_socket.recv(msg_bytes, zmq::recv_flags::none)) {
-        throw ZAFException("Receive empty message from ", current_net_gate_routing_id);
-      }
-      break;
-    } catch (const zmq::error_t& e) {
-      if (e.num() != EINTR) { throw; }
+  receive_guard([&]() {
+    if (!net_recv_socket.recv(msg_bytes, zmq::recv_flags::none)) {
+      throw ZAFException("Receive empty message from ", current_net_gate_routing_id);
     }
-  }
+  });
   Deserializer s(msg_bytes.data<char>());
   auto msg_code = deserialize<size_t>(s);
   // not reading msg_type here because it only receives Message::Type::Normal messages

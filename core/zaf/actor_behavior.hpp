@@ -11,6 +11,7 @@
 #include "macros.hpp"
 #include "make_message.hpp"
 #include "message_handlers.hpp"
+#include "receive_guard.hpp"
 #include "zaf_exception.hpp"
 
 #include "zmq.hpp"

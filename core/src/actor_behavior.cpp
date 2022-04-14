@@ -6,6 +6,7 @@
 #include "zaf/actor_behavior.hpp"
 #include "zaf/actor_system.hpp"
 #include "zaf/count_pointer.hpp"
+#include "zaf/receive_guard.hpp"
 #include "zaf/thread_utils.hpp"
 #include "zaf/zaf_exception.hpp"
 
@@ -96,14 +97,9 @@ void ActorBehavior::send(const LocalActorHandle& receiver, Message* m) {
   }
   auto recv_routing_id = get_routing_id(receiver_id, false);
   try {
-    while (true) {
-      try {
-        send_socket.send(zmq::buffer(recv_routing_id), zmq::send_flags::sndmore);
-        break;
-      } catch (const zmq::error_t& e) {
-        if (e.num() != EINTR) { throw; }
-      }
-    }
+    receive_guard([&]() {
+      send_socket.send(zmq::buffer(recv_routing_id), zmq::send_flags::sndmore);
+    });
   } catch (...) {
     std::throw_with_nested(ZAFException(
       "Failed to send a multi-part zmq message for receiver routing id:\n",
@@ -112,14 +108,9 @@ void ActorBehavior::send(const LocalActorHandle& receiver, Message* m) {
       "  receiver routing id: ", recv_routing_id));
   }
   try {
-    while (true) {
-      try {
-        send_socket.send(zmq::const_buffer(&m, sizeof(m)));
-        break;
-      } catch (const zmq::error_t& e) {
-        if (e.num() != EINTR) { throw; }
-      }
-    }
+    receive_guard([&]() {
+      send_socket.send(zmq::const_buffer(&m, sizeof(m)));
+    });
   } catch (...) {
     if (!bool(send_socket)) {
       std::throw_with_nested(ZAFException(
