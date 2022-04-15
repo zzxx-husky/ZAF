@@ -69,21 +69,21 @@ jobs:
       working-directory: ${{github.workspace}}/release
       run: |
         echo "Run HelloWorld"
-        timeout 10 ./examples/HelloWorld
+        timeout 10 ./examples/HelloWorld && sleep 0.1
         echo "Run HelloWorldX"
-        timeout 10 ./examples/HelloWorldX
+        timeout 10 ./examples/HelloWorldX && sleep 0.1
         echo "Run HelloWorldNetwork"
-        timeout 10 ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorldNetwork && sleep 0.1
         echo "Run HelloWorldByActorEngine"
-        timeout 10 ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine && sleep 0.1
         echo "Run Shuffle"
-        timeout 20 ./examples/Shuffle
+        timeout 20 ./examples/Shuffle && sleep 0.1
         echo "Run ShuffleX"
-        timeout 20 ./examples/ShuffleX
+        timeout 20 ./examples/ShuffleX && sleep 0.1
         echo "Run LoadRebalance"
-        timeout 20 ./examples/LoadRebalance
-        echo "RUn ActorDelivery"
-        timeout 20 ./examples/ActorDelivery
+        timeout 20 ./examples/LoadRebalance && sleep 0.1
+        echo "Run ActorDelivery"
+        timeout 20 ./examples/ActorDelivery && sleep 0.1
 
     - name: BuildMini
       run: |
@@ -96,13 +96,13 @@ jobs:
         cmake --build ${{github.workspace}}/release_mini -j4
         cd ${{github.workspace}}/release_mini
         echo "Run HelloWorld"
-        timeout 10 ./examples/HelloWorld
+        timeout 10 ./examples/HelloWorld && sleep 0.1
         echo "Run HelloWorldX"
-        timeout 10 ./examples/HelloWorldX
+        timeout 10 ./examples/HelloWorldX && sleep 0.1
         echo "Run HelloWorldByActorEngine"
-        timeout 10 ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine && sleep 0.1
         echo "Run HelloWorldNetwork"
-        timeout 10 ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorldNetwork && sleep 0.1
 
     - name: Gperftools Heap Profile
       working-directory: ${{github.workspace}}/release
@@ -119,13 +119,13 @@ jobs:
         cmake --build ${{github.workspace}}/release_clang -j4
         cd ${{github.workspace}}/release_clang
         echo "Run HelloWorld"
-        timeout 10 ./examples/HelloWorld
+        timeout 10 ./examples/HelloWorld && sleep 0.1
         echo "Run HelloWorldX"
-        timeout 10 ./examples/HelloWorldX
+        timeout 10 ./examples/HelloWorldX && sleep 0.1
         echo "Run HelloWorldByActorEngine"
-        timeout 10 ./examples/HelloWorldByActorEngine
+        timeout 10 ./examples/HelloWorldByActorEngine && sleep 0.1
         echo "Run HelloWorldNetwork"
-        timeout 10 ./examples/HelloWorldNetwork
+        timeout 10 ./examples/HelloWorldNetwork && sleep 0.1
       env:
         CC: clang
         CXX: clang++

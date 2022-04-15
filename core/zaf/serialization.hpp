@@ -24,7 +24,7 @@ template<typename POD,
   std::enable_if_t<std::is_pod_v<POD>>* = nullptr,
   std::enable_if_t<!std::is_pointer_v<POD>>* = nullptr>
 void deserialize(Deserializer& s, POD& pod) {
-  s.read_pod(pod);
+  s.read_pod(const_cast<std::remove_const_t<POD>&>(pod));
 }
 
 namespace traits {
@@ -155,18 +155,11 @@ void serialize(Serializer& s, const std::pair<A, B>& p) {
   serialize(s, p.second);
 }
 
-template<typename P,
-  std::enable_if_t<traits::is_pair<P>::value>* = nullptr,
-  typename A = typename traits::is_pair<P>::first_type,
-  typename B = typename traits::is_pair<P>::second_type,
-  std::enable_if_t<traits::is_loadable<A>::value && traits::is_loadable<B>::value>* = nullptr>
-std::pair<A, B> deserialize(Deserializer& s) {
-  auto a = deserialize<traits::remove_cvref_t<A>>(s);
-  auto b = deserialize<traits::remove_cvref_t<B>>(s);
-  return {
-    std::forward<decltype(a)>(a),
-    std::forward<decltype(b)>(b)
-  };
+template<typename A, typename B,
+  std::enable_if_t<traits::is_savable<A>::value && traits::is_savable<B>::value>* = nullptr>
+void deserialize(Deserializer& s, std::pair<A, B>& p) {
+  deserialize(s, p.first);
+  deserialize(s, p.second);
 }
 
 // 5. Serialization for std::string to write all the bytes together
