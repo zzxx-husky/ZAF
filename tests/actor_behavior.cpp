@@ -43,4 +43,54 @@ GTEST_TEST(ActorBehavior, DelayedSendWithReceiveTimeout) {
     EXPECT_TRUE(received);
   });
 }
+
+GTEST_TEST(ActorBehavior, ExtraRecvPoll) {
+  ActorSystem actor_system;
+
+  ActorBehavior actor1;
+  actor1.initialize_actor(actor_system, actor_system);
+
+  ActorBehavior actor2;
+  actor2.initialize_actor(actor_system, actor_system);
+
+  zmq::socket_t extra_recv;
+  unsigned num_recvs = 0;
+  {
+    extra_recv = zmq::socket_t(
+      actor_system.get_zmq_context(), zmq::socket_type::pull);
+    extra_recv.bind("inproc://ActorBehavior:ExtraRecvPoll");
+    actor2.add_recv_poll(extra_recv, [&]() {
+      zmq::message_t message;
+      EXPECT_TRUE(bool(extra_recv.recv(message)));
+      EXPECT_EQ("Extra Hello World",
+        std::string((char*) message.data(), message.size()));
+      ++num_recvs;
+      actor1.send(actor2, 0, std::string("Hello World"));
+      actor2.remove_recv_poll(extra_recv, [&]() {
+        extra_recv.unbind("inproc://ActorBehavior:ExtraRecvPoll");
+        extra_recv.close();
+      });
+    });
+  }
+
+  {
+    zmq::socket_t extra_send;
+    extra_send = zmq::socket_t(
+      actor_system.get_zmq_context(), zmq::socket_type::push);
+    extra_send.connect("inproc://ActorBehavior:ExtraRecvPoll");
+    extra_send.send(zmq::str_buffer("Extra Hello World"));
+    extra_send.close();
+  }
+
+  actor2.receive({
+    Code{0} - [&](const std::string& hw) {
+      EXPECT_EQ(hw, "Hello World");
+      ++num_recvs;
+      actor2.deactivate();
+    }
+  });
+
+  EXPECT_EQ(num_recvs, 2);
+}
+
 } // namespace zaf

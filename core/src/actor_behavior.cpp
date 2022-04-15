@@ -186,6 +186,7 @@ void ActorBehavior::initialize_recv_socket() {
   recv_poll_items.emplace_back(zmq::pollitem_t{
     recv_socket.handle(), 0, ZMQ_POLLIN, 0
   });
+  recv_poll_callbacks.push_back(nullptr);
 }
 
 void ActorBehavior::terminate_recv_socket() {
@@ -249,6 +250,50 @@ zmq::socket_t& ActorBehavior::get_recv_socket() {
 
 zmq::socket_t& ActorBehavior::get_send_socket() {
   return send_socket;
+}
+
+void ActorBehavior::add_recv_poll(
+  zmq::socket_t& socket, std::function<void()> callback) {
+  if (callback == nullptr) {
+    throw ZAFException("Callback for newly inserted recv socket must not be null.");
+  }
+  recv_poll_reqs.emplace_back(true, &socket, std::move(callback));
+}
+
+void ActorBehavior::remove_recv_poll(
+  zmq::socket_t& socket, std::function<void()> callback) {
+  recv_poll_reqs.emplace_back(false, &socket, std::move(callback));
+}
+
+void ActorBehavior::process_recv_poll_reqs() {
+  if (!recv_poll_reqs.empty()) {
+    for (auto& i : recv_poll_reqs) {
+      auto&& [add_or_del, socket, callback] = i;
+      auto&& handle = socket->handle();
+      if (add_or_del) {
+        recv_poll_items.emplace_back(zmq::pollitem_t{
+          handle, 0, ZMQ_POLLIN, 0
+        });
+        recv_poll_callbacks.push_back(std::move(callback));
+      } else {
+        for (int j = 1, n = recv_poll_items.size(); j < n; j++) {
+          if (recv_poll_items[j].socket == handle) {
+            if (callback) {
+              callback();
+            }
+            if (j != n - 1) {
+              std::swap(recv_poll_items[j], recv_poll_items.back());
+              std::swap(recv_poll_callbacks[j], recv_poll_callbacks.back());
+            }
+            recv_poll_items.pop_back();
+            recv_poll_callbacks.pop_back();
+            break;
+          }
+        }
+      }
+    }
+    recv_poll_reqs.clear();
+  }
 }
 
 void ActorBehavior::launch() {

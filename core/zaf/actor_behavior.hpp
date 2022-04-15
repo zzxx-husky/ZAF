@@ -93,6 +93,7 @@ public:
 
   // the API is similar with receive_once
   // the difference is that inner_receive_once does not handle delayed messages
+  // in case there are multiple recv_polls, receive once from each of the recv_polls that have messages
   template<typename Callback,
     typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   bool inner_receive_once(Callback&& callback, long timeout = -1);
@@ -140,6 +141,13 @@ public:
   zmq::socket_t& get_recv_socket();
   zmq::socket_t& get_send_socket();
 
+  // allow operator to register zmq::socket such that these sockets are polled together
+  // call the function if the socket has incoming msgs
+  void add_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
+  // call the function when the socket is removed
+  // socket should be kept alive until the callback is called.
+  void remove_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
+
   virtual void launch();
 
   virtual ~ActorBehavior();
@@ -155,6 +163,8 @@ protected:
   std::optional<std::chrono::milliseconds> remaining_time_to_next_delayed_message() const;
   void flush_delayed_messages();
 
+  void process_recv_poll_reqs();
+
   // time to send -> delayed message
   DefaultSortedMultiMap<TimePoint, DelayedMessage> delayed_messages;
 
@@ -167,9 +177,12 @@ protected:
 
   ActorIdType actor_id{~0u};
   zmq::socket_t send_socket, recv_socket;
-  std::vector<zmq::pollitem_t> recv_poll_items;
   ActorGroup* actor_group_ptr = nullptr;
   ActorSystem* actor_system_ptr = nullptr;
+
+  std::vector<zmq::pollitem_t> recv_poll_items;
+  std::vector<std::function<void()>> recv_poll_callbacks;
+  std::vector<std::tuple<bool, zmq::socket_t*, std::function<void()>>> recv_poll_reqs;
 
   MessageHandlers inner_handlers{}; // default: empty handlers
 

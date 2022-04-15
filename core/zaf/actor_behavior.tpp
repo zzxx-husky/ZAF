@@ -101,6 +101,7 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
     pending_messages.pop_front();
     return true;
   }
+  process_recv_poll_reqs();
   try {
     // if failed to receive or receive nothing, return
     if (int npoll = 0; !try_receive_guard([&]() {
@@ -111,24 +112,31 @@ bool ActorBehavior::inner_receive_once(Callback&& callback, long timeout) {
     }) || npoll == 0) {
       return false;
     }
-    zmq::message_t sender_routing_id;
-    receive_guard([&]() {
-      // receive current sender routing id
-      if (!recv_socket.recv(sender_routing_id)) {
-        throw ZAFException(
-          "Expect to receive a message but actually received nothing.");
+    if (recv_poll_items[0].revents & ZMQ_POLLIN) {
+      zmq::message_t sender_routing_id;
+      receive_guard([&]() {
+        // receive current sender routing id
+        if (!recv_socket.recv(sender_routing_id)) {
+          throw ZAFException(
+            "Expect to receive a message but actually received nothing.");
+        }
+      });
+      zmq::message_t message_ptr;
+      receive_guard([&]() {
+        if (!recv_socket.recv(message_ptr)) {
+          throw ZAFException(
+            "Failed to receive a message after having received an routing id at ",
+            __PRETTY_FUNCTION__
+          );
+        }
+        callback(*reinterpret_cast<Message**>(message_ptr.data()));
+      });
+    }
+    for (int i = 1, n = recv_poll_items.size(); i < n; i++) {
+      if (recv_poll_items[i].revents & ZMQ_POLLIN) {
+        recv_poll_callbacks[i]();
       }
-    });
-    zmq::message_t message_ptr;
-    receive_guard([&]() {
-      if (!recv_socket.recv(message_ptr)) {
-        throw ZAFException(
-          "Failed to receive a message after having received an routing id at ",
-          __PRETTY_FUNCTION__
-        );
-      }
-      callback(*reinterpret_cast<Message**>(message_ptr.data()));
-    });
+    }
     return true;
   } catch (...) {
     std::throw_with_nested(ZAFException(
