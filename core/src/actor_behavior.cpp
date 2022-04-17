@@ -276,6 +276,7 @@ void ActorBehavior::process_recv_poll_reqs() {
         });
         recv_poll_callbacks.push_back(std::move(callback));
       } else {
+        bool flag_found = false;
         for (int j = 1, n = recv_poll_items.size(); j < n; j++) {
           if (recv_poll_items[j].socket == handle) {
             if (callback) {
@@ -287,8 +288,14 @@ void ActorBehavior::process_recv_poll_reqs() {
             }
             recv_poll_items.pop_back();
             recv_poll_callbacks.pop_back();
+            flag_found = true;
             break;
           }
+        }
+        if (!flag_found) {
+          throw ZAFException(to_string(
+            "Failed to find socket with handle ", handle,
+            ". Do you keep the socket alive before it is removed?"));
         }
       }
     }

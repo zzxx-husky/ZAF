@@ -143,10 +143,10 @@ public:
 
   // allow operator to register zmq::socket such that these sockets are polled together
   // call the function if the socket has incoming msgs
-  void add_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
+  virtual void add_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
   // call the function when the socket is removed
   // socket should be kept alive until the callback is called.
-  void remove_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
+  virtual void remove_recv_poll(zmq::socket_t& socket, std::function<void()> callback);
 
   virtual void launch();
 

@@ -107,10 +107,10 @@ jobs:
     - name: Gperftools Heap Profile
       working-directory: ${{github.workspace}}/release
       run: |
-        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorld
-        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldX
-        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldByActorEngine
-        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldNetwork
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorld && sleep 0.1
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldX && sleep 0.1
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldByActorEngine && sleep 0.1
+        PPROF_PATH="$(which pprof)" HEAPCHECK=strict timeout 30 ./examples/HelloWorldNetwork && sleep 0.1
 
     - name: Compile with Clang
       run: |
