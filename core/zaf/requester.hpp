@@ -24,7 +24,7 @@ decltype(auto) Requester::request(ArgT&& ... args) {
 }
 
 // This seems to be a hack, i.e., need to know the details of Request
-static unsigned get_request_id(const Message& m) {
+inline static unsigned get_request_id(const Message& m) {
   auto& body = m.get_body();
   if (body.get_code() != DefaultCodes::Request) {
     throw ZAFException("Attempt to get request id from a non-request message. "

@@ -41,6 +41,8 @@ public:
     return {new_actor};
   }
 
+  virtual ~ActorGroup() = default;
+
 protected:
   virtual void init_scoped_actor(ActorBehavior&) = 0;
 

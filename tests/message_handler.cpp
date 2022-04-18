@@ -68,11 +68,11 @@ GTEST_TEST(MessageHandler, HandlersWithArgs) {
 GTEST_TEST(MessageHandler, HandlersWithObjArgs) {
   MessageHandlers handlers = {
     zaf::Code{0} - [&](const std::string& a) {
-      EXPECT_EQ(a.size(), 11);
+      EXPECT_EQ((int) a.size(), 11);
       EXPECT_EQ(a, "Hello World");
     },
     zaf::Code{1} - [&](const std::vector<int>& b) {
-      EXPECT_EQ(b.size(), 5);
+      EXPECT_EQ((int) b.size(), 5);
       EXPECT_EQ(b, (std::vector<int>{1,2,3,4,5}));
     },
     zaf::Code{2} - [&](int* x) {
@@ -97,7 +97,7 @@ GTEST_TEST(MessageHandler, HandlersWithObjArgs) {
 
 GTEST_TEST(MessageHandler, TypeMismatch) {
   MessageHandlers handlers = {
-    zaf::Code{0} - [&](const std::string& x) {}
+    zaf::Code{0} - [&](const std::string&) {}
   };
   auto m = make_message(nullptr, 0, "123");
   EXPECT_ANY_THROW(handlers.process(m));

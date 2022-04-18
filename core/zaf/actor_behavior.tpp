@@ -154,7 +154,7 @@ void ActorBehavior::delayed_send(const std::chrono::duration<Rep, Period>& delay
   auto now = std::chrono::steady_clock::now();
   auto send_time = now + delay;
   receiver.visit(overloaded{
-    [&](const LocalActorHandle& r) {
+    [&](const LocalActorHandle&) {
       auto m = new_message(Actor{this->get_local_actor_handle()},
         code, std::forward<ArgT>(args)...);
       delayed_messages.emplace(send_time, DelayedMessage(receiver, m));

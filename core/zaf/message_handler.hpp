@@ -34,15 +34,15 @@ public:
     handler(m);
   }
 
-  void process_body(MessageBody& body) override {
+  void process_body(MessageBody&) override {
     throw ZAFException("RawMessageHandler does not process MessageBody.");
   }
 
-  void process_body(MemoryMessageBody& body) override {
+  void process_body(MemoryMessageBody&) override {
     throw ZAFException("RawMessageHandler does not process MemoryMessageBody.");
   }
 
-  void process_body(SerializedMessageBody& body) override {
+  void process_body(SerializedMessageBody&) override {
     throw ZAFException("RawMessageHandler does not process SerializedMessageBody.");
   }
 };

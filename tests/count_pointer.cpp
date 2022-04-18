@@ -10,11 +10,13 @@ GTEST_TEST(CountPointer, NullPointer) {
 GTEST_TEST(CountPointer, CopyAndMove) {
   auto a = make_count<int>(-1);
   {
-    a = a;
+    auto& b = a;
+    a = b;
     EXPECT_EQ(*a, -1);
   }
   {
-    a = std::move(a);
+    auto& b = a;
+    a = std::move(b);
     EXPECT_EQ(*a, -1);
   }
   {
@@ -65,22 +67,22 @@ unsigned CountPointerClass::count = 0;
 
 GTEST_TEST(CountPointer, CustomizedClass) {
   auto a = make_count<internal::CountPointerClass>(internal::CountPointerClass());
-  EXPECT_EQ(1, internal::CountPointerClass::count);
+  EXPECT_EQ(1, (int) internal::CountPointerClass::count);
   a = nullptr;
-  EXPECT_EQ(0, internal::CountPointerClass::count);
+  EXPECT_EQ(0, (int) internal::CountPointerClass::count);
 
   a = make_count<internal::CountPointerClass>(internal::CountPointerClass());
   auto b = a;
-  EXPECT_EQ(1, internal::CountPointerClass::count);
+  EXPECT_EQ(1, (int) internal::CountPointerClass::count);
   auto c = b;
-  EXPECT_EQ(1, internal::CountPointerClass::count);
+  EXPECT_EQ(1, (int) internal::CountPointerClass::count);
   b = make_count<internal::CountPointerClass>(internal::CountPointerClass());
-  EXPECT_EQ(2, internal::CountPointerClass::count);
+  EXPECT_EQ(2, (int) internal::CountPointerClass::count);
   a = make_count<internal::CountPointerClass>(internal::CountPointerClass());
-  EXPECT_EQ(3, internal::CountPointerClass::count);
+  EXPECT_EQ(3, (int) internal::CountPointerClass::count);
   c = nullptr;
   a = nullptr;
   b = nullptr;
-  EXPECT_EQ(0, internal::CountPointerClass::count);
+  EXPECT_EQ(0, (int) internal::CountPointerClass::count);
 }
 } // namespace zaf

@@ -80,7 +80,7 @@ GTEST_TEST(Actor, RemoteActorLocalTransfer) {
     auto c = sys.create_scoped_actor();
     client.lookup_actor(*c, "127.0.0.1:45678", "A");
     c->receive_once({
-      client.on_lookup_actor_reply([&](std::string& url, std::string& name, Actor a) {
+      client.on_lookup_actor_reply([&](std::string&, std::string&, Actor a) {
         c->send(b, 1, a);
       })
     });

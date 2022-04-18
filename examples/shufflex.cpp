@@ -2,7 +2,7 @@
 
 #include "zaf/zaf.hpp"
 
-int main(int argc, char** argv) {
+int main() {
   int n_send = 3, n_recv = 3, n_msg = 1000000;
 
   zaf::ActorSystem system;
@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
   for (int i = 0; i < n_send; i++) {
     senders.emplace_back(system.spawn([=](zaf::ActorBehaviorX& self) {
       self.receive_once({
-        zaf::Code{0} - [n_send, n_recv, n_msg, &self](const std::vector<zaf::Actor>& receivers) {
+        zaf::Code{0} - [n_recv, n_msg, &self](const std::vector<zaf::Actor>& receivers) {
           for (int i = 0; i < n_msg; i++) {
             for (int j = 0; j < n_recv; j++) {
               self.send(receivers[j], 0, 0);

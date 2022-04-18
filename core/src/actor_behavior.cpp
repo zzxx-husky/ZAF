@@ -16,7 +16,8 @@ namespace zaf {
 ActorBehavior::ActorBehavior() {
   inner_handlers.add_handlers(
     DefaultCodes::Request -
-    [&](unsigned req_id, std::unique_ptr<MessageBody>& request) {
+    [&](unsigned /*req_id*/, std::unique_ptr<MessageBody>& request) {
+      // req_id is ignored because later it can be extracted via get_request_id()
       inner_handlers.process_body(*request);
     },
     DefaultCodes::Response -
@@ -374,7 +375,7 @@ void ActorBehavior::disconnect(ActorIdType peer_id) {
 // zmq_connect requires a `const char*` instead of `std::string`, in case the routing id
 // contains '\0', zmq ignores the part after the first '\0'. Sad.
 const std::string& ActorBehavior::get_routing_id(ActorIdType id, bool send_or_recv) {
-  for (int i = 0; i < ActorIdMaxLen; i++) {
+  for (size_t i = 0; i < ActorIdMaxLen; i++) {
     routing_id_buffer[i] = id % 10 + '0';
     id /= 10;
   }

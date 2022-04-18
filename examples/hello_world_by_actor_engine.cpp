@@ -38,11 +38,11 @@ public:
   zaf::Actor x;
 };
 
-int main(int argc, char** argv) {
+int main() {
   zaf::ActorSystem actor_system;
   zaf::ActorEngine engine{actor_system, 1};
   auto x = engine.spawn<X>();
-  auto y = engine.spawn<Y>(x);
+  engine.spawn<Y>(x);
   // engine.await_all_actors_done();
   // engine.terminate();
   // actor_system.await_all_actors_done();

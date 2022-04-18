@@ -7,7 +7,7 @@
 
 namespace zaf {
 namespace thread {
-static std::string get_name() {
+inline static std::string get_name() {
   auto native_handle = pthread_self();
   std::string name;
   name.resize(16);
@@ -29,10 +29,11 @@ static std::string get_name() {
  * After migrate the thread to the given cpu, reset the affinity to the original one
  * At the end, we migrate the thread but do not change the affinity
  */
-static void migrate_to_cpu(int target_cpu) {
+[[maybe_unused]]
+inline static void migrate_to_cpu(int target_cpu) {
   auto native_handle = pthread_self();
   std::string t_name = get_name();
-  auto old_cpu = sched_getcpu();
+  // auto old_cpu = sched_getcpu();
   cpu_set_t old_cpuset, cpuset;
   auto rc = pthread_getaffinity_np(native_handle, sizeof(cpu_set_t), &old_cpuset);
   if (rc != 0) {
@@ -52,7 +53,7 @@ static void migrate_to_cpu(int target_cpu) {
   }
 }
 
-static void set_name(const std::string& t_name) {
+inline static void set_name(const std::string& t_name) {
   auto native_handle = pthread_self();
   if (t_name.size() + 1 > 16) {
     throw ZAFException(t_name, " is too long. Thread name in linux is not "

@@ -21,6 +21,7 @@ set(BasicLibs pthread rt)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 if (DEFINED ENV{ZMQ_ROOT})
   set(ZMQ_ROOT_DIR $ENV{ZMQ_ROOT})

@@ -26,7 +26,7 @@ GTEST_TEST(CallableSignature, LambdaWithoutArg) {
   int z = 0;
   auto x = [&]() { z += 1; };
   EXPECT_TRUE(traits::is_callable<decltype(x)>::value);
-  EXPECT_EQ(traits::is_callable<decltype(x)>::args_t::size, 0);
+  EXPECT_EQ((int) traits::is_callable<decltype(x)>::args_t::size, 0);
   EXPECT_EQ(
     typeid(void),
     typeid(traits::is_callable<decltype(x)>::ret_t)

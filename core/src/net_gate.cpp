@@ -232,8 +232,9 @@ MessageHandlers NetGate::NetGateActor::behavior() {
             local_actor.requesters.clear();
           }
         },
-        [&](const RemoteActorHandle& r) {
-          throw ZAFException("Failed to register actor with name ", name, " because it is not a local actor.");
+        [&](const RemoteActorHandle&) {
+          throw ZAFException("Failed to register actor with name ", name,
+            " because it is not a local actor.");
         }
       });
     },
@@ -245,7 +246,7 @@ MessageHandlers NetGate::NetGateActor::behavior() {
         // no other else is asking for the same actor
         this->send_to_net_gate(url, RemoteActorLookupReq, name);
       }
-      requesters.push_back(std::move(this->take_current_message()));
+      requesters.push_back(this->take_current_message());
     },
     NetGate::RemoteActorLookupReq - [&](const std::string& name) {
       std::string peer{

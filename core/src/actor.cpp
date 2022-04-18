@@ -98,7 +98,7 @@ ActorInfo Actor::to_actor_info(const Actor& requester) const {
   return this->visit(overloaded{
     [&](const LocalActorHandle& l) {
       std::string url = requester.visit(overloaded{
-        [&](const LocalActorHandle& l) {
+        [&](const LocalActorHandle&) {
           return std::string("");
         },
         [&](const RemoteActorHandle& r) {

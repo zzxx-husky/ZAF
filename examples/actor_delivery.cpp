@@ -81,7 +81,7 @@ public:
   zaf::NetGateClient n;
 };
 
-int main(int argc, char** argv) {
+int main() {
   std::thread machine_a([]() {
     zaf::ActorSystem actor_system;
     zaf::NetGate gate{actor_system, "127.0.0.1", 12345};

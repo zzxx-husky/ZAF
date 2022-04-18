@@ -7,7 +7,8 @@ namespace zaf {
 class MessageHandlers {
 public:
   template<typename ... ArgT>
-  MessageHandlers(ArgT&& ... args) {
+  MessageHandlers(ArgT&& ... args):
+    default_handler(nullptr) {
     add_handlers(std::forward<ArgT>(args) ...);
   }
 

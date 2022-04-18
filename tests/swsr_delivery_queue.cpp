@@ -126,7 +126,7 @@ GTEST_TEST(SWSRDeliveryQueue, MultiToMulti) {
 
   std::thread writers[W];
   for (int w = 0; w < W; w++) {
-    writers[w] = std::move(std::thread{[&, w]() {
+    writers[w] = std::thread{[&, w]() {
       for (int i = 0; i < num_messages; i += 1000) {
         for (int j = 0; j < 1000; j++) {
           for (int r = 0; r < R; r++) {
@@ -141,12 +141,12 @@ GTEST_TEST(SWSRDeliveryQueue, MultiToMulti) {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds{1});
       }
-    }});
+    }};
   }
 
   std::thread readers[R];
   for (int r = 0; r < R; r++) {
-    readers[r] = std::move(std::thread{[&, r]() {
+    readers[r] = std::thread{[&, r]() {
       int num_receive[W] = {0};
       bool active[W] = {false};
       for (int total_receive = 0, exepcted_total_receive = num_messages * W;
@@ -172,7 +172,7 @@ GTEST_TEST(SWSRDeliveryQueue, MultiToMulti) {
           }, 10000);
         }
       }
-    }});
+    }};
   }
 
   for (int w = 0; w < W; w++) {

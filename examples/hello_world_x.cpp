@@ -17,10 +17,10 @@ public:
   }
 };
 
-int main(int argc, char** argv) {
+int main() {
   zaf::ActorSystem actor_system;
   auto x = actor_system.spawn<X>();
-  auto y = actor_system.spawn([x](zaf::ActorBehaviorX& self) {
+  actor_system.spawn([x](zaf::ActorBehaviorX& self) {
     self.send(x, 1, std::string("hello"));
     self.receive({
       zaf::Code{0} - [&](const std::string& world) {

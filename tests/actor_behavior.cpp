@@ -24,7 +24,7 @@ GTEST_TEST(ActorBehavior, Basic) {
 GTEST_TEST(ActorBehavior, DelayedSendWithReceiveTimeout) {
   ActorSystem actor_system;
 
-  auto a = actor_system.spawn([&](ActorBehavior& self) {
+  actor_system.spawn([&](ActorBehavior& self) {
     self.delayed_send(std::chrono::seconds{1}, self, Code{0});
     bool received = false;
     for (int i = 0; i < 4; i++) {
@@ -90,7 +90,7 @@ GTEST_TEST(ActorBehavior, ExtraRecvPoll) {
     }
   });
 
-  EXPECT_EQ(num_recvs, 2);
+  EXPECT_EQ((int) num_recvs, 2);
 }
 
 } // namespace zaf

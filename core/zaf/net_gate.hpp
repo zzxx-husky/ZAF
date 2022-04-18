@@ -116,7 +116,7 @@ private:
         net_send_socket.send(zmq::buffer(ng_url + "/r"), zmq::send_flags::sndmore);
         net_send_socket.send(zmq::message_t{&bytes.front(), bytes.size()}, zmq::send_flags::none);
       } else {
-        conn.pending_messages.emplace_back(std::move(zmq::message_t{&bytes.front(), bytes.size()}));
+        conn.pending_messages.emplace_back(zmq::message_t{&bytes.front(), bytes.size()});
       }
     }
 
@@ -130,7 +130,7 @@ private:
         .write(msg_code)
         .write(type_hash)
         .write(std::forward<ArgT>(args) ...);
-      auto& conn = net_gate_connections.at(ng_url);
+      // auto& conn = net_gate_connections.at(ng_url);
       net_send_socket.send(zmq::buffer(ng_url + "/r"), zmq::send_flags::sndmore);
       net_send_socket.send(zmq::message_t{&bytes.front(), bytes.size()}, zmq::send_flags::none);
     }

@@ -136,13 +136,13 @@ GTEST_TEST(Request, ByResponse2) {
             std::unique_ptr<MessageBody>(new_message(Code{1}, target)));
           self.deactivate();
         } else {
-          requester = std::move(self.take_current_message());
+          requester = self.take_current_message();
         }
       }
     });
   });
 
-  auto b = actor_system.spawn([&](ActorBehavior& self) {
+  actor_system.spawn([&](ActorBehavior& self) {
     self.request(a, 1).on_reply({
       Code{1} - [&](Actor c) {
         self.request(c, 2, 45678).on_reply({
@@ -155,7 +155,7 @@ GTEST_TEST(Request, ByResponse2) {
     });
   });
 
-  auto c = actor_system.spawn([&](ActorBehavior& self) {
+  actor_system.spawn([&](ActorBehavior& self) {
     self.send(a, 0);
     self.receive_once({
       Code{2} - [&](int v) {
@@ -179,7 +179,7 @@ GTEST_TEST(Request, UnorderedRequest) {
     });
   });
 
-  auto b = actor_system.spawn([&](ActorBehavior& self) {
+  actor_system.spawn([&](ActorBehavior& self) {
     std::vector<ActorBehavior::RequestHandler> reqs;
     for (int i = 0; i < 10; i++) {
       reqs.emplace_back(self.request(a, 0, i));

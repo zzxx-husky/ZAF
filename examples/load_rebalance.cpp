@@ -26,7 +26,7 @@ public:
   const std::chrono::milliseconds work_duration;
 };
 
-int main(int argc, char** argv) {
+int main() {
   zaf::ActorSystem actor_system;
 
   for (int i = 0; i < 3; i++) {

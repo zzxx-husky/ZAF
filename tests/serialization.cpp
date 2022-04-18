@@ -218,11 +218,11 @@ GTEST_TEST(SerializedMessage, HandlersWithArgs) {
 GTEST_TEST(SerializedMessage, HandlersWithObjArgs) {
   MessageHandlers handlers = {
     Code{0} - [&](const std::string& a) {
-      EXPECT_EQ(a.size(), 11);
+      EXPECT_EQ((int) a.size(), 11);
       EXPECT_EQ(a, "Hello World");
     },
     Code{1} - [&](const std::vector<int>& b) {
-      EXPECT_EQ(b.size(), 5);
+      EXPECT_EQ((int) b.size(), 5);
       EXPECT_EQ(b, (std::vector<int>{1,2,3,4,5}));
     },
     Code{2} - [&](int* x) {
@@ -244,11 +244,11 @@ GTEST_TEST(SerializedMessage, HandlersWithObjArgs) {
 GTEST_TEST(SerializedMessage, MessageInMessage) {
   MessageHandlers handlers = {
     Code{0} - [&](const std::string& a) {
-      EXPECT_EQ(a.size(), 11);
+      EXPECT_EQ((int) a.size(), 11);
       EXPECT_EQ(a, "Hello World");
     },
     Code{1} - [&](const std::vector<int>& b) {
-      EXPECT_EQ(b.size(), 5);
+      EXPECT_EQ((int) b.size(), 5);
       EXPECT_EQ(b, (std::vector<int>{1,2,3,4,5}));
     },
     Code{2} - [&](int* x) {

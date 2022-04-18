@@ -17,7 +17,7 @@ using ActorIdType = ZAF_ACTOR_ID_TYPE;
 inline constexpr size_t ActorIdMaxLen = ZAF_ACTOR_ID_MAX_LEN;
 inline constexpr size_t MaxActorId = []() {
   size_t max_id = 1;
-  for (int i = 0; i < ActorIdMaxLen; i++) {
+  for (size_t i = 0; i < ActorIdMaxLen; i++) {
     max_id *= 10;
   }
   return max_id;

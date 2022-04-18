@@ -3,8 +3,8 @@
 namespace zaf {
 MessageHandlers::MessageHandlers(MessageHandlers&& other):
   handlers(std::move(other.handlers)),
-  default_handler(std::move(other.default_handler)),
-  child(other.child) {
+  child(other.child),
+  default_handler(std::move(other.default_handler)) {
   other.child = nullptr;
 }
 
