@@ -26,16 +26,16 @@ struct NetGateClient {
 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
-    typename std::enable_if_t<Sig::value>* = nullptr,
-    typename std::enable_if_t<std::is_invocable_v<Handler, std::string&, std::string&, Actor&>>* = nullptr>
+    std::enable_if_t<Sig::value>* = nullptr,
+    std::enable_if_t<std::is_invocable_v<Handler, std::string&, std::string&, Actor&>>* = nullptr>
   inline auto on_lookup_actor_reply(Handler&& handler) const {
     return NetGate::ActorLookupRep - std::forward<Handler>(handler);
   }
 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
-    typename std::enable_if_t<Sig::value>* = nullptr,
-    typename std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
+    std::enable_if_t<Sig::value>* = nullptr,
+    std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
   inline auto on_lookup_actor_reply(Handler&& handler) const {
     return NetGate::ActorLookupRep -
     [h = std::forward<Handler>(handler)](std::string&, std::string&, Actor& actor) {
@@ -57,16 +57,16 @@ struct NetGateClient {
 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
-    typename std::enable_if_t<Sig::value>* = nullptr,
-    typename std::enable_if_t<std::is_invocable_v<Handler, ActorInfo&, Actor&>>* = nullptr>
+    std::enable_if_t<Sig::value>* = nullptr,
+    std::enable_if_t<std::is_invocable_v<Handler, ActorInfo&, Actor&>>* = nullptr>
   inline auto on_retrieve_actor_reply(Handler&& handler) const {
     return NetGate::RetrieveActorRep - std::forward<Handler>(handler);
   }
 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
-    typename std::enable_if_t<Sig::value>* = nullptr,
-    typename std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
+    std::enable_if_t<Sig::value>* = nullptr,
+    std::enable_if_t<std::is_invocable_v<Handler, Actor&>>* = nullptr>
   inline auto on_retrieve_actor_reply(Handler&& handler) const {
     return NetGate::RetrieveActorRep -
       [h = std::forward<Handler>(handler)](ActorInfo&, Actor& a) {
@@ -82,8 +82,8 @@ struct NetGateClient {
 
   template<typename Handler,
     typename Sig = traits::is_callable<Handler>,
-    typename std::enable_if_t<Sig::value>* = nullptr,
-    typename std::enable_if_t<std::is_invocable_v<Handler, int>>* = nullptr>
+    std::enable_if_t<Sig::value>* = nullptr,
+    std::enable_if_t<std::is_invocable_v<Handler, int>>* = nullptr>
   inline auto on_bind_port_reply(Handler&& handler) const {
     return NetGate::NetGateBindPortRep - std::forward<Handler>(handler);
   }

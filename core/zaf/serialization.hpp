@@ -11,6 +11,13 @@
 #include "zaf_exception.hpp"
 
 namespace zaf {
+// 0. Deserialization for const data type
+template<typename T,
+  std::enable_if_t<std::is_const_v<T>>* = nullptr>
+void deserialize(Deserializer& s, T& t) {
+  deserialize(s, traits::remove_const(t));
+}
+
 // 1. Serialization for POD
 template<typename POD,
   typename RAW = traits::remove_cvref_t<POD>,
@@ -21,6 +28,7 @@ void serialize(Serializer& s, POD&& pod) {
 }
 
 template<typename POD,
+  std::enable_if_t<!std::is_const_v<POD>>* = nullptr,
   std::enable_if_t<std::is_pod_v<POD>>* = nullptr,
   std::enable_if_t<!std::is_pointer_v<POD>>* = nullptr>
 void deserialize(Deserializer& s, POD& pod) {
@@ -158,6 +166,7 @@ void serialize(Serializer& s, const std::pair<A, B>& p) {
 template<typename A, typename B,
   std::enable_if_t<traits::is_savable<A>::value && traits::is_savable<B>::value>* = nullptr>
 void deserialize(Deserializer& s, std::pair<A, B>& p) {
+  // Note: we allow pair to carry `const` here.
   deserialize(s, p.first);
   deserialize(s, p.second);
 }
@@ -175,7 +184,7 @@ inline void deserialize(Deserializer& s, std::string& str) {
 
 // 6. Serialization for std::optional
 template<typename T,
-  typename std::enable_if_t<
+  std::enable_if_t<
     !std::is_reference_v<T> &&
     traits::is_savable<T>::value
   >* = nullptr>
@@ -188,7 +197,7 @@ inline void serialize(Serializer& s, const std::optional<T>& o) {
 }
 
 template<typename T,
-  typename std::enable_if_t<
+  std::enable_if_t<
     !std::is_reference_v<T> &&
     traits::is_loadable<T>::value
   >* = nullptr>
@@ -199,7 +208,7 @@ inline void deserialize(Deserializer& s, std::optional<T>& o) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
 void deserialize(Deserializer& s, CountPointer<T>& ptr) {
   if (s.read<bool>()) {
     auto ptr = s.read<T*>();
@@ -210,7 +219,7 @@ void deserialize(Deserializer& s, CountPointer<T>& ptr) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
 void serialize(Serializer& s, const CountPointer<T>& ptr) {
   if (bool(ptr)) {
     s.write(true).write(ptr.get());
@@ -220,7 +229,7 @@ void serialize(Serializer& s, const CountPointer<T>& ptr) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
 void deserialize(Deserializer& s, std::unique_ptr<T>& ptr) {
   if (s.read<bool>()) {
     ptr = std::unique_ptr<T>(s.read<T*>());
@@ -230,7 +239,7 @@ void deserialize(Deserializer& s, std::unique_ptr<T>& ptr) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
 void serialize(Serializer& s, const std::unique_ptr<T>& ptr) {
   if (bool(ptr)) {
     s.write(true).write(ptr.get());
@@ -240,7 +249,7 @@ void serialize(Serializer& s, const std::unique_ptr<T>& ptr) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_loadable<T*>::value>* = nullptr>
 void deserialize(Deserializer& s, std::shared_ptr<T>& ptr) {
   if (s.read<bool>()) {
     ptr = std::shared_ptr<T>(s.read<T*>());
@@ -250,7 +259,7 @@ void deserialize(Deserializer& s, std::shared_ptr<T>& ptr) {
 }
 
 template<typename T,
-  typename std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
+  std::enable_if_t<traits::is_savable<T*>::value>* = nullptr>
 void serialize(Serializer& s, const std::shared_ptr<T>& ptr) {
   if (bool(ptr)) {
     s.write(true).write(ptr.get());
@@ -260,7 +269,7 @@ void serialize(Serializer& s, const std::shared_ptr<T>& ptr) {
 }
 
 template<typename ... ArgT,
-  typename std::enable_if_t<traits::all_serializable<ArgT ...>::value>* = nullptr>
+  std::enable_if_t<traits::all_serializable<ArgT ...>::value>* = nullptr>
 void serialize(Serializer& s, const std::tuple<ArgT ...>& t) {
   serialize(s, t, std::make_index_sequence<std::tuple_size_v<std::tuple<ArgT ...>>>{});
 }

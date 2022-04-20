@@ -14,7 +14,7 @@ public:
 
   // Initizalize with an existing pointer
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer(U* ptr) {
     if (ptr) {
       value = ptr;
@@ -27,7 +27,7 @@ public:
   }
 
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer(const CountPointer<U>& ptr):
     value(ptr.value),
     count(ptr.count),
@@ -43,7 +43,7 @@ public:
   }
 
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer(CountPointer<U>&& ptr) :
     value(ptr.value),
     count(ptr.count),
@@ -64,7 +64,7 @@ public:
 
   // give up the old one and create a new pointer
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer<T>& operator=(U* ptr) {
     dec_count();
     if (ptr) {
@@ -79,7 +79,7 @@ public:
   }
 
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer<T>& operator=(const CountPointer<U>& ptr) {
     if (count != ptr.count) {
       dec_count();
@@ -103,7 +103,7 @@ public:
   }
 
   template<typename U,
-    typename std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
+    std::enable_if_t<std::is_convertible_v<U*, T*>>* = nullptr>
   CountPointer<T>& operator=(CountPointer<U>&& ptr) {
     if (this == &ptr) {
       return *this;

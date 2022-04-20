@@ -34,10 +34,10 @@ public:
 
   template<typename Callable,
     typename Signature = traits::is_callable<Callable>,
-    typename std::enable_if_t<Signature::value>* = nullptr,
-    typename std::enable_if_t<Signature::args_t::size == 1>* = nullptr,
+    std::enable_if_t<Signature::value>* = nullptr,
+    std::enable_if_t<Signature::args_t::size == 1>* = nullptr,
     typename ActorType = typename Signature::args_t::template decay_arg_t<0>,
-    typename std::enable_if_t<std::is_base_of_v<ActorBehavior, ActorType>>* = nullptr>
+    std::enable_if_t<std::is_base_of_v<ActorBehavior, ActorType>>* = nullptr>
   Actor spawn(Callable&& callable) {
     auto new_actor = new ActorType();
     new_actor->initialize_actor(*this, *this);

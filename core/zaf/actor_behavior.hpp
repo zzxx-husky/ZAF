@@ -76,7 +76,7 @@ public:
   void receive(MessageHandlers& handlers);
 
   template<typename Callback,
-    typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
+    std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   inline void receive(Callback&& callback) {
     this->activate();
     while (this->is_activated()) {
@@ -88,14 +88,14 @@ public:
   // timeout == -1, block until receiving a message
   // timeout > 0, wait for specified timeout or until receiving a message
   template<typename Callback,
-    typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
+    std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   bool receive_once(Callback&& callback, long timeout = -1);
 
   // the API is similar with receive_once
   // the difference is that inner_receive_once does not handle delayed messages
   // in case there are multiple recv_polls, receive once from each of the recv_polls that have messages
   template<typename Callback,
-    typename std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
+    std::enable_if_t<std::is_invocable_v<Callback, Message*>>* = nullptr>
   bool inner_receive_once(Callback&& callback, long timeout = -1);
 
   template<typename Rep, typename Period, typename ... ArgT>

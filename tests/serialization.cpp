@@ -31,6 +31,13 @@ struct hash<zaf::Z> {
     return 0;
   }
 };
+
+template<typename A, typename B>
+struct hash<pair<A, B>> {
+  inline size_t operator()(const pair<A, B>& a) const {
+    return hash<A>{}(a.first) ^ hash<B>{}(a.second);
+  }
+};
 } // namespace std
 
 namespace zaf {
@@ -58,6 +65,7 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_TRUE((traits::all_serializable<std::map<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<std::set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<std::unordered_map<int, int>>::value));
+  EXPECT_TRUE((traits::all_serializable<std::unordered_map<std::pair<int, int>, int>>::value));
   EXPECT_TRUE(traits::all_serializable<std::unordered_set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<DefaultHashMap<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<DefaultHashSet<int>>::value);
@@ -148,6 +156,18 @@ GTEST_TEST(SerializedMessage, Basic) {
     EXPECT_EQ(*a, *b);
     delete a;
     delete b;
+  }
+  {
+    std::vector<char> bytes;
+    Serializer s(bytes);
+    std::unordered_map<std::pair<int, int>, int> map = {
+      {{1, 2}, 3},
+      {{2, 3}, 4}
+    };
+    s.write(map);
+    Deserializer d(bytes);
+    auto b = d.read<decltype(map)>();
+    EXPECT_EQ(map, b);
   }
 }
 

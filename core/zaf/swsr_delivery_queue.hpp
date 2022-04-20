@@ -247,7 +247,7 @@ public:
 
   // OnReachMaxEmptyRead: action to take for stopping the reader from reading the queue when the queue is empty
   template<typename PopHandler, typename OnReachMaxEmptyRead,
-    typename std::enable_if_t<std::is_invocable_v<OnReachMaxEmptyRead>>* = nullptr>
+    std::enable_if_t<std::is_invocable_v<OnReachMaxEmptyRead>>* = nullptr>
   inline void pop_some(PopHandler&& handler, OnReachMaxEmptyRead&& on_reach_max_empty_read, unsigned max_messages_read) {
     if (0 == pop_some(handler, max_messages_read)) {
       if (++num_empty_read == max_empty_read) {

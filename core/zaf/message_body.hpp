@@ -207,7 +207,7 @@ private:
 void serialize(Serializer&, MessageBody*);
 
 template<typename T,
-  typename std::enable_if_t<std::is_same_v<T, MessageBody*>>* = nullptr>
+  std::enable_if_t<std::is_same_v<T, MessageBody*>>* = nullptr>
 T deserialize(Deserializer& s) {
   auto code = s.read<Code>();
   auto type_hash = s.read<size_t>();
