@@ -27,9 +27,7 @@ struct Z { private: std::string b; };
 namespace std {
 template<>
 struct hash<zaf::Z> {
-  inline size_t operator()(const zaf::Z&) const {
-    return 0;
-  }
+  inline size_t operator()(const zaf::Z&) const { return 0; }
 };
 
 template<typename A, typename B>
@@ -66,6 +64,7 @@ GTEST_TEST(SerializedMessage, Traits) {
   EXPECT_TRUE(traits::all_serializable<std::set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<std::unordered_map<int, int>>::value));
   EXPECT_TRUE((traits::all_serializable<std::unordered_map<std::pair<int, int>, int>>::value));
+  EXPECT_TRUE((traits::all_serializable<std::unordered_map<std::string, int>>::value));
   EXPECT_TRUE(traits::all_serializable<std::unordered_set<int>>::value);
   EXPECT_TRUE((traits::all_serializable<DefaultHashMap<int, int>>::value));
   EXPECT_TRUE(traits::all_serializable<DefaultHashSet<int>>::value);
