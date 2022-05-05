@@ -14,10 +14,19 @@ if (NOT DEFINED ENABLE_PHMAP)
 endif ()
 message("-- ENABLE_PHMAP: " ${ENABLE_PHMAP})
 if (NOT DEFINED ENABLE_TCMALLOC)
-  set(ENABLE_TCMALLOC ON)
+  if (APPLE)
+    set(ENABLE_TCMALLOC OFF)
+  else ()
+    set(ENABLE_TCMALLOC ON)
+  endif ()
 endif ()
 message("-- ENABLE_TCMALLOC: " ${ENABLE_TCMALLOC})
-set(BasicLibs pthread rt)
+
+if (APPLE)
+  set(BasicLibs pthread)
+else ()
+  set(BasicLibs pthread rt)
+endif ()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
@@ -102,6 +111,9 @@ set_target_properties(zaf_static PROPERTIES
 set_target_properties(zaf_shared PROPERTIES
   OUTPUT_NAME zaf
   VERSION ${PROJECT_VERSION})
+if (APPLE)
+  target_link_libraries(zaf_shared ${ZAFDepsSources})
+endif ()
 include(GNUInstallDirs)
 install(TARGETS zaf_static
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
