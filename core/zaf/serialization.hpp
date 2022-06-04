@@ -165,7 +165,7 @@ void serialize(Serializer& s, const std::pair<A, B>& p) {
 }
 
 template<typename A, typename B,
-  std::enable_if_t<traits::is_savable<A>::value && traits::is_savable<B>::value>* = nullptr>
+  std::enable_if_t<traits::is_loadable<A>::value && traits::is_loadable<B>::value>* = nullptr>
 void deserialize(Deserializer& s, std::pair<A, B>& p) {
   // Note: we allow pair to carry `const` here.
   deserialize(s, p.first);

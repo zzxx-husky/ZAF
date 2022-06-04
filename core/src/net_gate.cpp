@@ -433,8 +433,12 @@ void NetGate::NetGateActor::launch() {
 }
 
 void NetGate::NetGateActor::initialize_send_socket() {
+  if (bool(net_send_socket)) {
+    return;
+  }
   this->ActorBehaviorX::initialize_send_socket();
   net_send_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
+  this->initialize_recv_socket();
   auto routing_id = to_string(bind_host, ':', bind_port, "/s");
   net_send_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
   net_send_socket.set(zmq::sockopt::sndhwm, 0);
@@ -442,12 +446,33 @@ void NetGate::NetGateActor::initialize_send_socket() {
 }
 
 void NetGate::NetGateActor::initialize_recv_socket() {
+  if (bool(net_recv_socket)) {
+    return;
+  }
   this->ActorBehaviorX::initialize_recv_socket();
   net_recv_socket = zmq::socket_t(this->get_actor_system().get_zmq_context(), zmq::socket_type::router);
-  auto routing_id = to_string(bind_host, ':', bind_port, "/r");
-  net_recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
-  auto bind_url = to_string("tcp://", bind_host, ':', bind_port);
-  net_recv_socket.bind(bind_url);
+  if (bind_port == 0) {
+    while (true) {
+      // randomly generate a port within [10000, 65536) and try
+      auto rand_bind_port = rand() % (65536 - 10000) + 10000;
+      auto routing_id = to_string(bind_host, ':', rand_bind_port, "/r");
+      net_recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
+      auto bind_url = to_string("tcp://", bind_host, ':', rand_bind_port);
+      try {
+        net_recv_socket.bind(bind_url);
+      } catch (...) {
+        // re-try
+        continue;
+      }
+      bind_port = rand_bind_port;
+      break;
+    }
+  } else {
+    auto routing_id = to_string(bind_host, ':', bind_port, "/r");
+    net_recv_socket.set(zmq::sockopt::routing_id, zmq::buffer(routing_id));
+    auto bind_url = to_string("tcp://", bind_host, ':', bind_port);
+    net_recv_socket.bind(bind_url);
+  }
 }
 
 void NetGate::NetGateActor::terminate_send_socket() {
